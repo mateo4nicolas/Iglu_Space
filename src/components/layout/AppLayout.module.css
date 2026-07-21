@@ -1,0 +1,21 @@
+.layout {
+  display: flex;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  background: var(--bg);
+}
+
+.main {
+  margin-left: var(--sidebar-width);
+  flex: 1;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  .main {
+    margin-left: 0;
+    padding-top: calc(56px + var(--safe-top));
+  }
+}

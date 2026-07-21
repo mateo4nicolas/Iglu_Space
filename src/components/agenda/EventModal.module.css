@@ -1,0 +1,122 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  width: 100%;
+  max-width: 460px;
+  overflow: hidden;
+  max-height: 92dvh;
+  max-height: 92vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 600px) {
+  .overlay { align-items: center; padding: 24px; }
+  .modal { border-radius: var(--radius-xl); max-height: 90dvh; max-height: 90vh; }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+
+.closeBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  transition: all 0.12s;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+.closeBtn:active { color: var(--text-primary); background: var(--bg-hover); }
+@media (hover: hover) { .closeBtn:hover { color: var(--text-primary); background: var(--bg-hover); } }
+
+.form {
+  padding: 18px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: calc(24px + var(--safe-bottom));
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.row { display: flex; gap: 12px; }
+.label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+
+.input, .select, .textarea {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 11px 12px;
+  font-size: 16px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  font-family: var(--font);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.input:disabled, .select:disabled, .textarea:disabled { opacity: 0.65; cursor: not-allowed; }
+.input:focus, .select:focus, .textarea:focus { border-color: var(--accent); }
+.input::placeholder, .textarea::placeholder { color: var(--text-muted); }
+.textarea { resize: none; line-height: 1.5; }
+
+.select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239099ab' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+  background-color: var(--bg-surface);
+}
+
+.colorRow { display: flex; gap: 8px; flex-wrap: wrap; }
+.colorChip {
+  width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent;
+  cursor: pointer; transition: transform 0.12s, border-color 0.12s; padding: 0;
+}
+.colorChip:disabled { cursor: not-allowed; opacity: 0.6; }
+.colorSel { border-color: var(--text-primary); transform: scale(1.12); }
+
+.peopleGrid { display: flex; flex-wrap: wrap; gap: 6px; }
+.personChip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 99px;
+  padding: 5px 10px 5px 5px; font-size: 12px; color: var(--text-secondary);
+  cursor: pointer; transition: all 0.12s;
+}
+.personChip:disabled { cursor: not-allowed; opacity: 0.75; }
+.personSelected { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.chipAvatar {
+  width: 20px; height: 20px; border-radius: 50%; background: var(--accent-dim); color: var(--accent);
+  font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.personSelected .chipAvatar { background: var(--accent); color: #fff; }
+
+.footer { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding-top: 4px; flex-wrap: wrap; }
+.confirmText { font-size: 12px; color: var(--text-secondary); margin-right: auto; }

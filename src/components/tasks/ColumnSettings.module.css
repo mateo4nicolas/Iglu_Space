@@ -1,0 +1,35 @@
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.25); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; padding: 0; }
+.modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-xl) var(--radius-xl) 0 0; width: 100%; max-width: 500px; box-shadow: var(--shadow-lg); overflow: hidden; max-height: 92dvh; max-height: 92vh; display: flex; flex-direction: column; }
+
+@media (min-width: 600px) {
+  .overlay { align-items: center; padding: 24px; }
+  .modal { border-radius: var(--radius-xl); max-height: 90dvh; max-height: 90vh; }
+}
+
+.header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.title { font-size: 15px; font-weight: 600; }
+.closeBtn { background: none; border: none; color: var(--text-muted); padding: 6px; border-radius: var(--radius-sm); display: flex; transition: all 0.12s; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; touch-action: manipulation; }
+.closeBtn:active { color: var(--text-primary); background: var(--bg-hover); }
+@media (hover: hover) { .closeBtn:hover { color: var(--text-primary); background: var(--bg-hover); } }
+
+.body { padding: 14px 20px; display: flex; flex-direction: column; gap: 7px; overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; }
+.colRow { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-hover); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.colorDot { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; position: relative; cursor: pointer; }
+.colorInput { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; border: none; padding: 0; }
+.nameInput { flex: 1; background: none; border: none; font-size: 16px; color: var(--text-primary); outline: none; font-family: var(--font); -webkit-appearance: none; appearance: none; }
+.nameInput::placeholder { color: var(--text-muted); }
+.assignSelect { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 16px; color: var(--text-secondary); outline: none; font-family: var(--font); -webkit-appearance: none; appearance: none; }
+.delBtn { background: none; border: none; color: var(--text-muted); display: flex; padding: 4px; border-radius: 4px; transition: all 0.12s; flex-shrink: 0; min-width: 36px; min-height: 36px; align-items: center; justify-content: center; touch-action: manipulation; }
+.delBtn:active { color: var(--danger); background: var(--danger-dim); }
+@media (hover: hover) { .delBtn:hover { color: var(--danger); background: var(--danger-dim); } }
+
+.addBtn { background: none; border: 1px dashed var(--border); border-radius: var(--radius-md); padding: 11px; font-size: 13px; color: var(--text-secondary); transition: all 0.12s; min-height: 44px; touch-action: manipulation; -webkit-appearance: none; appearance: none; }
+.addBtn:active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+@media (hover: hover) { .addBtn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); } }
+
+.footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0; padding-bottom: calc(12px + var(--safe-bottom)); }
+.roleSection { display: flex; flex-direction: column; gap: 6px; }
+.roleHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 4px; }
+.roleLabel { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.roleHint { font-size: 11px; color: var(--text-muted); }
+.roleDivider { height: 1px; background: var(--border); margin: 14px 0; }

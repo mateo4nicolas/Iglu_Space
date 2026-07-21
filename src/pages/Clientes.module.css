@@ -1,0 +1,60 @@
+.page { padding: 24px 28px; max-width: 1100px; }
+.loading { padding: 40px; color: var(--text-secondary); }
+.topbar { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+.pageTitle { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.pageSubtitle { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.empty { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+.toggleBtn { background: var(--bg-hover); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 14px; font-size: 12.5px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.12s; touch-action: manipulation; }
+.toggleBtn:active { border-color: var(--accent); color: var(--accent); }
+@media (hover: hover) { .toggleBtn:hover { border-color: var(--accent); color: var(--accent); } }
+.toggleBtnActive { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+.periodGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 768px) {
+  .page { padding: 14px; }
+  .topbar { flex-direction: column; align-items: flex-start; }
+  .periodGrid { grid-template-columns: 1fr; }
+}
+
+.periodColumn { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 14px 16px; box-shadow: var(--shadow-sm); }
+.periodHeader { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.periodDot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.periodTitle { font-size: 13.5px; font-weight: 600; color: var(--text-primary); flex: 1; }
+.periodCount { font-size: 11px; color: var(--text-muted); background: var(--bg-hover); border: 1px solid var(--border); padding: 1px 8px; border-radius: 99px; }
+.noClients { font-size: 12px; color: var(--text-muted); font-style: italic; padding: 6px 2px; }
+
+.clientList { display: flex; flex-direction: column; gap: 8px; }
+.clientCard { display: flex; align-items: center; gap: 10px; background: var(--bg-hover); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 10px 10px 12px; transition: box-shadow 0.15s; }
+.clientCardArchived { opacity: 0.7; }
+.clientAvatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.clientInfo { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.clientName { font-size: 13.5px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clientActions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.iconBtn { background: none; border: none; color: var(--text-muted); padding: 8px; border-radius: var(--radius-sm); display: flex; transition: all 0.12s; min-width: 36px; min-height: 36px; align-items: center; justify-content: center; touch-action: manipulation; }
+.iconBtn:active { background: var(--bg-card); color: var(--text-primary); }
+@media (hover: hover) { .iconBtn:hover { background: var(--bg-card); color: var(--text-primary); } }
+
+/* Modal */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; display: flex; align-items: flex-end; justify-content: center; padding: 0; }
+.modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-xl) var(--radius-xl) 0 0; width: 100%; max-width: 480px; max-height: 92dvh; max-height: 92vh; overflow-y: auto; -webkit-overflow-scrolling: touch; box-shadow: var(--shadow-xl); }
+@media (min-width: 600px) { .overlay { align-items: center; padding: 16px; } .modal { border-radius: var(--radius-xl); max-height: 90dvh; max-height: 90vh; } }
+.modalHeader { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 0; }
+.modalHeader h2 { font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 0; }
+.closeBtn { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; border-radius: 4px; display: flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; touch-action: manipulation; }
+.closeBtn:active { color: var(--text-primary); }
+.modalForm { padding: 14px 18px; display: flex; flex-direction: column; }
+.label { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; margin-top: 12px; display: block; }
+.label:first-child { margin-top: 0; }
+.input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-hover); color: var(--text-primary); font-size: 16px; outline: none; box-sizing: border-box; -webkit-appearance: none; appearance: none; font-family: var(--font); transition: border-color 0.15s; }
+.input:focus { border-color: var(--accent); }
+
+.periodOptions { display: flex; gap: 8px; flex-wrap: wrap; }
+.periodOption { flex: 1; min-width: 120px; padding: 10px 12px; border-radius: var(--radius-md); border: 1.5px solid var(--border); background: var(--bg-hover); color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.12s; touch-action: manipulation; min-height: 44px; }
+.periodOption:active { border-color: var(--accent); }
+@media (hover: hover) { .periodOption:hover { border-color: var(--accent); } }
+.periodOptionSel { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+.errorMsg { font-size: 12px; color: var(--danger); margin-top: 10px; }
+
+.modalFooter { display: flex; justify-content: flex-end; gap: 8px; padding-top: 16px; margin-top: 8px; border-top: 1px solid var(--border); padding-bottom: var(--safe-bottom); }

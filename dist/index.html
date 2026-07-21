@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="theme-color" content="#5b5fcf" />
+    <title>TeamFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      /* Prevent white flash before React mounts, on any device */
+      html, body { background: #f8f9fb; margin: 0; padding: 0; height: 100%; }
+      #root { min-height: 100vh; }
+      @supports (height: 100dvh) {
+        #root { min-height: 100dvh; }
+      }
+      /* Visible loading hint in case JS takes time on slow/old devices */
+      #boot-fallback {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #4b5263; font-size: 14px; background: #f8f9fb;
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-DikqGxWK.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-RrEZdwJV.css">
+  </head>
+  <body>
+    <div id="root">
+      <div id="boot-fallback">Cargando…</div>
+    </div>
+    <noscript>
+      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center;font-family:sans-serif;">
+        Esta aplicación necesita JavaScript activado para funcionar.
+      </div>
+    </noscript>
+  </body>
+</html>

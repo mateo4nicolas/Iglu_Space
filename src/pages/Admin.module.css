@@ -1,0 +1,48 @@
+.page { padding: 24px 28px; max-width: 1000px; }
+.loading { padding: 40px; color: var(--text-secondary); }
+.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 10px; }
+.pageTitle { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.greeting { font-size: 13px; color: var(--text-muted); }
+.statsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+.statCard { border-radius: var(--radius-lg); padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
+.statIcon { font-size: 20px; }
+.statValue { font-size: 30px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+.statLabel { font-size: 12px; color: var(--text-secondary); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cardFull { grid-column: 1 / -1; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-sm); }
+.cardHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cardTitle { font-size: 14px; font-weight: 600; }
+.empty { font-size: 13px; color: var(--text-muted); }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.approvalItem { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; background: var(--warning-dim); border: 1px solid rgba(217,119,6,0.15); border-radius: var(--radius-md); flex-wrap: wrap; }
+.taskItem { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.taskItem:last-child { border-bottom: none; }
+.taskDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.itemTitle { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.itemSub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.approveBtn { background: var(--success-dim); border: none; color: var(--success); font-size: 12px; font-weight: 500; padding: 7px 12px; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font); transition: background 0.12s; min-height: 36px; touch-action: manipulation; }
+.approveBtn:active { background: rgba(22,163,74,0.18); }
+@media (hover: hover) { .approveBtn:hover { background: rgba(22,163,74,0.18); } }
+.rejectBtn { background: var(--danger-dim); border: none; color: var(--danger); font-size: 12px; font-weight: 500; padding: 7px 12px; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font); transition: background 0.12s; min-height: 36px; touch-action: manipulation; }
+.rejectBtn:active { background: rgba(220,38,38,0.18); }
+@media (hover: hover) { .rejectBtn:hover { background: rgba(220,38,38,0.18); } }
+.logList { display: flex; flex-direction: column; gap: 2px; }
+.logItem { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-md); transition: background 0.1s; }
+.logItem:active { background: var(--bg-hover); }
+@media (hover: hover) { .logItem:hover { background: var(--bg-hover); } }
+.logIcon { font-size: 14px; flex-shrink: 0; }
+.logInfo { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.logUser { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; }
+.logBody { font-size: 13px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logTime { font-size: 11px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+
+@media (max-width: 768px) {
+  .page { padding: 14px; }
+  .statsGrid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid { grid-template-columns: 1fr; }
+  .cardFull { grid-column: 1; }
+}
+@media (max-width: 480px) {
+  .statsGrid { grid-template-columns: 1fr 1fr; }
+}
