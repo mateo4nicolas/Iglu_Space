@@ -25,11 +25,11 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 // aquí si vas a subir este archivo a git).
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://aqulnrxevadlffrtqycc.supabase.co'
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_zki0o2mnZTOHR4rx17u0og_Xp-h2hIm' // Project Settings > API > service_role (secreta)
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY // Project Settings > API > service_role (secreta) — NUNCA hardcodear, solo variable de entorno
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || 'e4c6ea1507066e0c8b0ba03169ff7008'
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || '43fe216c3f3e07fb4f31379979e86e12'
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || 'a299578f8add61270784d40d48f39fe69cf1af25d894454aaa7ba118c74d219a' // pégala aquí solo en tu máquina, no la subas a git
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID // Cloudflare > R2 > Manage API Tokens
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY // NUNCA hardcodear, solo variable de entorno
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || 'iglu-media-tasks'
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || 'https://pub-d2aa7869262d4c5b81f69834bb9ba10d.r2.dev'
 
