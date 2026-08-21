@@ -23,6 +23,71 @@
 .dayTabToday:not(.dayTabActive) { border-color: var(--accent); }
 .dayTabToday:not(.dayTabActive) .dayTabName { color: var(--accent); }
 
+/* Vistas por videógrafo */
+.viewTabs { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+.viewTab { background: var(--bg-card); border: 1px solid var(--border); border-radius: 99px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; white-space: nowrap; touch-action: manipulation; transition: all 0.12s; }
+.viewTab:active { border-color: var(--accent); color: var(--accent); }
+@media (hover: hover) { .viewTab:hover { border-color: var(--accent); color: var(--accent); } }
+.viewTabActive { background: var(--accent); border-color: var(--accent); color: #fff; }
+.viewTabWrap { position: relative; display: flex; align-items: center; }
+.viewTabRemove { position: absolute; right: -4px; top: -4px; width: 16px; height: 16px; background: var(--danger); color: #fff; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.addViewBtn { display: flex; align-items: center; gap: 4px; background: var(--accent-dim); border: 1px dashed var(--accent); border-radius: 99px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; color: var(--accent); cursor: pointer; white-space: nowrap; touch-action: manipulation; }
+
+/* Subida de Material (distinto visualmente al bloque de estado) */
+/* Sección independiente "Subida de Material" */
+.materialSection { margin-top: 22px; }
+.materialSectionHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.materialSectionTitle { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.materialGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.materialCard { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.materialCardClient { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.materialCardVideographers { font-size: 11.5px; color: var(--text-muted); }
+.materialCardFooter { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.materialToggle { display: flex; border: 1.5px solid var(--border); border-radius: 99px; overflow: hidden; }
+.materialBtn { border: none; background: var(--bg-card); color: var(--text-muted); font-size: 11.5px; font-weight: 600; padding: 6px 12px; cursor: pointer; touch-action: manipulation; min-height: 30px; transition: all 0.12s; }
+.materialBtn:disabled { cursor: default; opacity: 0.6; }
+.materialBtnOn.materialBtnActive  { background: #6d28d9; color: #fff; }
+.materialBtnOff.materialBtnActive { background: var(--bg-hover); color: var(--text-primary); font-weight: 700; }
+.materialDeleteBtn { background: none; border: none; color: var(--text-muted); padding: 4px; border-radius: var(--radius-sm); display: flex; cursor: pointer; }
+.materialDeleteBtn:hover { background: var(--danger-dim); color: var(--danger); }
+.materialCardHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.materialCardTime { font-size: 11px; font-weight: 600; color: var(--text-muted); flex-shrink: 0; }
+
+/* Formulario en fila (fecha + hora) */
+.formRow { display: flex; gap: 10px; }
+
+/* Botón "Colores de videógrafos" */
+.colorsBtn { display: flex; align-items: center; gap: 4px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 99px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; white-space: nowrap; touch-action: manipulation; }
+
+/* Fila de color por videógrafo dentro del modal de colores */
+.colorRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.colorRow:last-child { border-bottom: none; }
+.colorRowName { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+
+/* Toggle Lista / Semana */
+.modeToggle { display: flex; border: 1.5px solid var(--border); border-radius: 99px; overflow: hidden; margin-left: auto; }
+.modeBtn { border: none; background: var(--bg-card); color: var(--text-muted); font-size: 12px; font-weight: 600; padding: 6px 14px; cursor: pointer; touch-action: manipulation; }
+.modeBtnActive { background: var(--accent); color: #fff; }
+
+/* Vista semanal tipo calendario */
+.calendarWrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow-x: auto; margin-bottom: 18px; }
+.calendarGrid { display: grid; min-width: 700px; }
+.calendarCorner { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+.calendarDayHeader { display: flex; flex-direction: column; align-items: center; padding: 8px 4px; font-size: 11.5px; font-weight: 700; color: var(--text-secondary); text-transform: capitalize; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+.calendarDayHeaderDate { font-size: 10.5px; font-weight: 500; color: var(--text-muted); text-transform: none; }
+.calendarHoursCol { border-right: 1px solid var(--border); }
+.calendarHourLabel { display: flex; align-items: flex-start; justify-content: center; font-size: 10px; color: var(--text-muted); padding-top: 2px; border-bottom: 1px solid var(--border); box-sizing: border-box; }
+.calendarDayCol { position: relative; border-right: 1px solid var(--border); }
+.calendarHourLine { border-bottom: 1px solid var(--border); box-sizing: border-box; }
+.calendarEvent { position: absolute; left: 3px; right: 3px; border-radius: var(--radius-sm); border: 1px solid; color: #fff; font-size: 10.5px; font-weight: 600; padding: 3px 6px; text-align: left; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; gap: 1px; touch-action: manipulation; }
+.calendarEventTitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.calendarEventTime { font-size: 9.5px; opacity: 0.85; font-weight: 500; }
+
+/* Selector de color de vista */
+.colorList { display: flex; gap: 8px; flex-wrap: wrap; }
+.colorSwatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.colorSwatchActive { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--bg-card); }
+
 .empty { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; text-align: center; color: var(--text-muted); font-size: 13px; box-shadow: var(--shadow-sm); }
 
 .list { display: flex; flex-direction: column; gap: 14px; }

@@ -90,6 +90,18 @@ export function useMatriz() {
     return { error }
   }
 
+  // ── Checkbox "Tabla de productos" por cliente ────────────────────────────
+  async function toggleTablaProductos(clientId) {
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, tabla_productos: !c.tabla_productos } : c))
+    const { data, error } = await supabase.rpc('toggle_tabla_productos', { p_client_id: clientId })
+    if (error) {
+      fetchAll()
+    } else {
+      setClients(prev => prev.map(c => c.id === clientId ? { ...c, tabla_productos: data } : c))
+    }
+    return { data, error }
+  }
+
   // ── Gestión de columnas dinámicas de la matriz ──────────────────────────
   async function saveMatrizColumn(col) {
     if (col.id) {
@@ -147,6 +159,7 @@ export function useMatriz() {
     updateTask,
     approveTask,
     deleteTask,
+    toggleTablaProductos,
     saveMatrizColumn,
     deleteMatrizColumn,
     generarProximoMes,

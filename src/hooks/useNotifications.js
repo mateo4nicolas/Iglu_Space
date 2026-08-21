@@ -33,7 +33,6 @@ export function useNotifications() {
         const n = payload.new
         setNotifications(prev => [n, ...prev])
         setUnreadCount(prev => prev + 1)
-        showPushNotification(n.title, n.body)
         showInAppToast(n)
       })
       .subscribe()
@@ -57,26 +56,14 @@ export function useNotifications() {
   return { notifications, unreadCount, markRead, markAllRead, refetch: fetchNotifications }
 }
 
-// Push notification (browser)
+// Push notification (browser) — mantenido por compatibilidad, aunque el push
+// real ahora lo maneja el Service Worker (ver usePushNotifications.js), que
+// sí funciona con la app cerrada.
 export async function requestPushPermission() {
   if (!('Notification' in window)) return false
   if (Notification.permission === 'granted') return true
   const result = await Notification.requestPermission()
   return result === 'granted'
-}
-
-function showPushNotification(title, body) {
-  if (typeof window === 'undefined') return
-  if (!('Notification' in window)) return
-  if (Notification.permission !== 'granted') return
-  if (document.visibilityState === 'visible') return // solo cuando la app no está en foco
-  try {
-    new Notification(title, {
-      body: body || '',
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
-    })
-  } catch (e) {}
 }
 
 // In-app toast (emitimos un evento custom que el componente Toast escucha)

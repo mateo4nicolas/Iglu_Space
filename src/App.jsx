@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { ProtectedRoute, AdminRoute, PublicOnlyRoute } from './components/auth/RouteGuards'
 import AppLayout from './components/layout/AppLayout'
 import Login from './components/auth/Login'
@@ -13,10 +14,13 @@ import GrabacionesPage from './pages/Grabaciones'
 import ClientesPage from './pages/Clientes'
 import MatrizPage from './pages/Matriz'
 import AgendaGestionPage from './pages/AgendaGestion'
+import ContenidoExtraPage from './pages/ContenidoExtra'
+import ConfiguracionPage from './pages/Configuracion'
 import ToastContainer from './components/ui/Toast'
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -29,14 +33,17 @@ export default function App() {
             <Route path="/grabaciones"   element={<GrabacionesPage />} />
             <Route path="/clientes"      element={<AdminRoute><ClientesPage /></AdminRoute>} />
             <Route path="/matriz"        element={<MatrizPage />} />
+            <Route path="/contenido-extra" element={<ContenidoExtraPage />} />
             <Route path="/agenda-gestion" element={<AdminRoute><AgendaGestionPage /></AdminRoute>} />
             <Route path="/equipo"        element={<AdminRoute><EquipoPage /></AdminRoute>} />
             <Route path="/admin"         element={<AdminRoute><AdminPage /></AdminRoute>} />
+            <Route path="/configuracion" element={<ConfiguracionPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
         <ToastContainer />
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   )
 }

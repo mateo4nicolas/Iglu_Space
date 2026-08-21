@@ -9,7 +9,19 @@
     <meta name="format-detection" content="telephone=no" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="theme-color" content="#5b5fcf" />
-    <title>TeamFlow</title>
+    <title>Iglu Space</title>
+    <script>
+      // Aplica el tema guardado ANTES de pintar, para evitar el flash blanco
+      // al recargar en modo oscuro.
+      try {
+        var t = localStorage.getItem('teamflow-theme')
+        if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark')
+      } catch (e) {}
+    </script>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -26,6 +38,8 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         color: #4b5263; font-size: 14px; background: #f8f9fb;
       }
+      html[data-theme="dark"], html[data-theme="dark"] body { background: #0e0f13; }
+      html[data-theme="dark"] #boot-fallback { background: #0e0f13; color: #b4b8c6; }
     </style>
   </head>
   <body>

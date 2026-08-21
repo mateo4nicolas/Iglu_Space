@@ -35,6 +35,16 @@ window.addEventListener('unhandledrejection', function (event) {
 })
 
 try {
+  // Registrar el Service Worker (requerido para notificaciones push, incluso
+  // con la app agregada a la pantalla de inicio en iPhone).
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (err) {
+        console.error('SW registration error:', err)
+      })
+    })
+  }
+
   // Polyfill: Array.prototype.at (missing on some older Android WebViews)
   if (!Array.prototype.at) {
     Array.prototype.at = function (n) {

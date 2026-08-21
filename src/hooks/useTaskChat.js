@@ -91,16 +91,30 @@ export function useTaskChat(taskId) {
     }
 
     // 3. Guardar el mensaje con la URL pública de R2
-    const isVideo = file.type.startsWith('video/')
-    const { error } = await supabase.from('task_messages').insert({
-      task_id: taskId,
-      user_id: profile.id,
-      content: null,
-      attachment_url: signed.publicUrl,
-      attachment_type: isVideo ? 'video' : 'image',
-      attachment_name: file.name,
-    })
-    return { error: error || null }
+    const VIDEO_EXT = /\.(mp4|mov|webm|mkv|avi|m4v|3gp)$/i
+    const isVideo = file.type.startsWith('video/') || (!file.type && VIDEO_EXT.test(file.name))
+    const { data: inserted, error } = await supabase
+      .from('task_messages')
+      .insert({
+        task_id: taskId,
+        user_id: profile.id,
+        content: null,
+        attachment_url: signed.publicUrl,
+        attachment_type: isVideo ? 'video' : 'image',
+        attachment_name: file.name,
+      })
+      .select('*, profiles(id, full_name, display_name)')
+      .single()
+
+    if (error) return { error }
+
+    // Se agrega de inmediato al estado local en vez de esperar solo al evento
+    // realtime (que puede llegar tarde o, si el canal se reconectó, no llegar).
+    if (inserted) {
+      setMessages(prev => (prev.some(m => m.id === inserted.id) ? prev : [...prev, inserted]))
+    }
+
+    return { error: null }
   }
 
   // Sube varios archivos con concurrencia limitada (evita saturar el ancho de

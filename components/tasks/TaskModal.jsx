@@ -182,18 +182,9 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
   }
 
   const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
-  const IMAGE_EXT = /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i
-  const VIDEO_EXT = /\.(mp4|mov|webm|mkv|avi|m4v|3gp)$/i
-
-  function isMediaFile(f) {
-    if (f.type?.startsWith('image/') || f.type?.startsWith('video/')) return true
-    // Algunos navegadores móviles no informan el MIME type (type === '') al
-    // capturar fotos/videos con la cámara; en ese caso se valida por extensión.
-    return IMAGE_EXT.test(f.name) || VIDEO_EXT.test(f.name)
-  }
 
   async function processFiles(fileList) {
-    const files = Array.from(fileList || []).filter(isMediaFile)
+    const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
     if (files.length === 0) return
 
     const tooBig = files.filter(f => f.size > MAX_FILE_SIZE)
@@ -208,7 +199,7 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
     if (oversizedItems.length > 0) {
       setUploadQueue(prev => [...prev, ...oversizedItems])
       oversizedItems.forEach(item => {
-        setTimeout(() => setUploadQueue(prev => prev.filter(q => q.id !== item.id)), 8000)
+        setTimeout(() => setUploadQueue(prev => prev.filter(q => q.id !== item.id)), 5000)
       })
     }
     if (valid.length === 0) return
@@ -221,34 +212,21 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
     }))
     setUploadQueue(prev => [...prev, ...queueItems])
 
-    const failures = []
     await sendFiles(valid, (file, status, error) => {
       const idx = valid.indexOf(file)
       const qId = queueItems[idx]?.id
       if (!qId) return
       setUploadQueue(prev => prev.map(q => (q.id === qId ? { ...q, status, message: error?.message } : q)))
-      if (status === 'error') failures.push(`${file.name}: ${error?.message || 'error desconocido'}`)
       setTimeout(() => {
         setUploadQueue(prev => prev.filter(q => q.id !== qId))
-      }, status === 'error' ? 8000 : 1200)
+      }, status === 'error' ? 5000 : 1200)
     })
 
     setSending(false)
-
-    // Si TODOS los archivos fallaron, es casi siempre un problema de
-    // configuración (credenciales R2 o CORS del bucket) y no del archivo en
-    // sí — se muestra el error real para poder diagnosticarlo.
-    if (failures.length > 0 && failures.length === valid.length) {
-      alert('No se pudo subir el material multimedia:\n\n' + failures.join('\n') + '\n\nSi el error menciona "CORS", "Failed to fetch" o "NetworkError", revisa la configuración de CORS del bucket R2 (debe permitir PUT desde este dominio).')
-    }
   }
 
-
   function handleFile(e) {
-    // Se copia a un arreglo ANTES de limpiar el input: en algunos navegadores
-    // e.target.files es una referencia viva ligada al input, y resetear
-    // e.target.value la vacía también, dejando processFiles con 0 archivos.
-    const files = Array.from(e.target.files || [])
+    const files = e.target.files
     e.target.value = ''
     processFiles(files)
   }

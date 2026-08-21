@@ -40,6 +40,7 @@ export default function MatrizPage() {
     updateTask,
     approveTask,
     deleteTask,
+    toggleTablaProductos,
     saveMatrizColumn,
     deleteMatrizColumn,
     generarProximoMes,
@@ -121,6 +122,7 @@ export default function MatrizPage() {
             <thead>
               <tr>
                 <th className={styles.cornerCell}>Cliente</th>
+                <th className={styles.colHeader} style={{ minWidth: 90 }}>Tabla de productos</th>
                 {activeMatrizColumns.map(col => (
                   <th key={col.id} className={styles.colHeader}>{col.label}</th>
                 ))}
@@ -133,6 +135,17 @@ export default function MatrizPage() {
                   <td className={styles.rowHeader}>
                     <span className={styles.clientDot}>{client.brand_name[0]?.toUpperCase()}</span>
                     {client.brand_name}
+                  </td>
+                  <td className={styles.cell}>
+                    <div className={styles.checkboxWrap}>
+                      <input
+                        type="checkbox"
+                        className={styles.checkboxSquare}
+                        checked={!!client.tabla_productos}
+                        onChange={() => toggleTablaProductos(client.id)}
+                        title="Tabla de productos"
+                      />
+                    </div>
                   </td>
                   {activeMatrizColumns.map(col => {
                     const task = taskFor(client.id, col.value, mesAno)
