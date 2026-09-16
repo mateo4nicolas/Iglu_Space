@@ -86,8 +86,15 @@ export function useMatriz() {
   }
 
   async function setClientActiveFrom(clientId, mes, active) {
-    setClientVisibility(prev => [...prev, { cliente_id: clientId, mes, active }])
-    const { error } = await supabase.from('matriz_client_visibility').insert({ cliente_id: clientId, mes, active })
+    setClientVisibility(prev => {
+      const exists = prev.some(v => v.cliente_id === clientId && v.mes === mes)
+      return exists
+        ? prev.map(v => (v.cliente_id === clientId && v.mes === mes ? { ...v, active } : v))
+        : [...prev, { cliente_id: clientId, mes, active }]
+    })
+    const { error } = await supabase
+      .from('matriz_client_visibility')
+      .upsert({ cliente_id: clientId, mes, active }, { onConflict: 'cliente_id,mes' })
     if (error) fetchAll()
     return { error }
   }

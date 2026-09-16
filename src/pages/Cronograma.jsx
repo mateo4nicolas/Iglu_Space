@@ -22,6 +22,7 @@ export default function CronogramaPage() {
   const [showLinkTask, setShowLinkTask] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [openTask, setOpenTask] = useState(null) // { task, columns }
+  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'pending' | 'overdue'
 
   const {
     items,
@@ -74,6 +75,21 @@ export default function CronogramaPage() {
   const dateLabel = format(selectedDate, "EEEE d 'de' MMMM, yyyy", { locale: es })
   const progress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
 
+  function matchesStatusFilter(item) {
+    if (statusFilter === 'overdue') return item.is_overdue
+    if (statusFilter === 'pending') return !item.is_overdue && !isDoneByAll(item)
+    return true
+  }
+
+  const filteredItems = items.filter(matchesStatusFilter)
+  const filteredItemsByUser = Object.fromEntries(
+    Object.entries(itemsByUser)
+      .map(([uid, data]) => [uid, { ...data, items: data.items.filter(matchesStatusFilter) }])
+      .filter(([, data]) => data.items.length > 0)
+  )
+  const overdueCount = items.filter(i => i.is_overdue).length
+  const pendingCount = items.filter(i => !i.is_overdue && !isDoneByAll(i)).length
+
   return (
     <div className={styles.page}>
       <div className={styles.topbar}>
@@ -123,6 +139,27 @@ export default function CronogramaPage() {
             )}
           </div>
 
+          <div className={styles.viewToggle} style={{ marginBottom: 12 }}>
+            <button
+              className={`${styles.viewBtn} ${statusFilter === 'all' ? styles.viewBtnActive : ''}`}
+              onClick={() => setStatusFilter('all')}
+            >
+              Todo ({totalCount})
+            </button>
+            <button
+              className={`${styles.viewBtn} ${statusFilter === 'pending' ? styles.viewBtnActive : ''}`}
+              onClick={() => setStatusFilter('pending')}
+            >
+              Pendiente ({pendingCount})
+            </button>
+            <button
+              className={`${styles.viewBtn} ${statusFilter === 'overdue' ? styles.viewBtnActive : ''}`}
+              onClick={() => setStatusFilter('overdue')}
+            >
+              Atrasado ({overdueCount})
+            </button>
+          </div>
+
           {isAdmin && totalCount > 0 && (
             <div className={styles.progressBar}>
               <div className={styles.progressHeader}>
@@ -138,9 +175,9 @@ export default function CronogramaPage() {
           {loading ? (
             <p className={styles.loading}>Cargando...</p>
           ) : isAdmin ? (
-            <AdminView itemsByUser={itemsByUser} onToggle={toggleDone} onDelete={deleteItem} onEdit={setEditingItem} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} adminSetDone={adminSetDone} onCompleteNative={completeNativeItem} onOpenTask={handleOpenTask} />
+            <AdminView itemsByUser={filteredItemsByUser} onToggle={toggleDone} onDelete={deleteItem} onEdit={setEditingItem} onSaveObs={updateObservation} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} adminSetDone={adminSetDone} onCompleteNative={completeNativeItem} onOpenTask={handleOpenTask} />
           ) : (
-            <UserView items={items} onToggle={toggleDone} onSaveObs={updateObservation} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} onCompleteNative={completeNativeItem} onOpenTask={handleOpenTask} />
+            <UserView items={filteredItems} onToggle={toggleDone} onSaveObs={updateObservation} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} onCompleteNative={completeNativeItem} onOpenTask={handleOpenTask} />
           )}
         </>
       ) : (
@@ -287,7 +324,7 @@ function MonthView({ calMonth, setCalMonth, onSelectDate }) {
   )
 }
 
-function AdminView({ itemsByUser, onToggle, onDelete, onEdit, isDoneByUser, isDoneByAll, adminSetDone, onCompleteNative, onOpenTask }) {
+function AdminView({ itemsByUser, onToggle, onDelete, onEdit, onSaveObs, isDoneByUser, isDoneByAll, adminSetDone, onCompleteNative, onOpenTask }) {
   const entries = Object.entries(itemsByUser)
   if (entries.length === 0) return <EmptyState isAdmin />
   return (
@@ -307,7 +344,7 @@ function AdminView({ itemsByUser, onToggle, onDelete, onEdit, isDoneByUser, isDo
           </div>
           <div className={styles.itemList}>
             {items.map(item => (
-              <PendienteItem key={item.id} item={item} isAdmin onToggle={onToggle} onDelete={onDelete} onEdit={onEdit} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} uid={assignee?.id} onCompleteNative={onCompleteNative} onOpenTask={onOpenTask} />
+              <PendienteItem key={item.id} item={item} isAdmin onToggle={onToggle} onDelete={onDelete} onEdit={onEdit} onSaveObs={onSaveObs} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} uid={assignee?.id} onCompleteNative={onCompleteNative} onOpenTask={onOpenTask} />
             ))}
           </div>
         </div>
@@ -442,27 +479,21 @@ function PendienteItem({ item, isAdmin, onToggle, onDelete, onEdit, onSaveObs, i
         </div>
         {item.notes && <p className={styles.itemNotes}>{item.notes}</p>}
 
-        {!isAdmin && (
-          showObs ? (
-            <div className={styles.obsBox}>
-              <textarea className={styles.obsInput} value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Escribe tu observación..." rows={2} />
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button className="btn btn-primary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={saveObs}>Guardar</button>
-                <button className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setShowObs(false)}>Cancelar</button>
-              </div>
+        {showObs ? (
+          <div className={styles.obsBox}>
+            <textarea className={styles.obsInput} value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Escribe tu observación..." rows={2} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn btn-primary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={saveObs}>Guardar</button>
+              <button className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setShowObs(false)}>Cancelar</button>
             </div>
-          ) : (
-            <div className={styles.obsRow}>
-              {item.user_observation && <p className={styles.obsText}>📝 {item.user_observation}</p>}
-              <button className={styles.obsBtn} onClick={() => setShowObs(true)}>
-                {item.user_observation ? 'Editar observación' : '+ Añadir observación'}
-              </button>
-            </div>
-          )
-        )}
-
-        {isAdmin && item.user_observation && (
-          <p className={styles.obsAdmin}>Observación: {item.user_observation}</p>
+          </div>
+        ) : (
+          <div className={styles.obsRow}>
+            {item.user_observation && <p className={styles.obsText}>📝 {item.user_observation}</p>}
+            <button className={styles.obsBtn} onClick={() => setShowObs(true)}>
+              {item.user_observation ? 'Editar observación' : '+ Añadir observación'}
+            </button>
+          </div>
         )}
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, flexDirection: 'column' }}>

@@ -6,6 +6,7 @@ export const FORMATO_OPTS = [
   { value: 'post',       label: 'Post',       color: '#1e9e5a' },
   { value: 'historia',   label: 'Historia',   color: '#d92d2d' },
   { value: 'variacion',  label: 'Variación',  color: '#2563eb' },
+  { value: 'video',      label: 'Video',      color: '#9333ea' },
   { value: 'otro',       label: 'Otro',       color: '#d4a91a' },
 ]
 
@@ -33,7 +34,6 @@ export const PUBLICACION_OPTS = [
 
 export const PRESUPUESTO_OPTS = [
   { value: 'campana',       label: 'Campaña',        color: '#1e9e5a' },
-  { value: 'anuncio_extra', label: 'Anuncio Extra',  color: '#d92d2d' },
   { value: 'campana_extra', label: 'Campaña Extra',  color: '#d4a91a' },
   { value: 'no_aplica',     label: 'No Aplica',      color: '#8a5a2b' },
 ]
