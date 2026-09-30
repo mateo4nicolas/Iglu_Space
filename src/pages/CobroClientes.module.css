@@ -1,0 +1,45 @@
+.page { padding: 24px 28px; max-width: 1200px; }
+.loading { padding: 40px; color: var(--text-secondary); }
+.topbar { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+.pageTitle { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.pageSubtitle { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.empty { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+.monthNav { display: flex; align-items: center; gap: 4px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 3px; }
+.monthNavBtn { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: none; background: none; border-radius: var(--radius-sm); color: var(--text-muted); cursor: pointer; }
+.monthNavBtn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.monthNavLabel { font-size: 12.5px; font-weight: 700; padding: 0 6px; min-width: 130px; text-align: center; }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.tab { display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; }
+.tabActive { color: var(--accent); border-bottom-color: var(--accent); }
+.tabCount { font-size: 10.5px; font-weight: 700; background: var(--bg-hover); border: 1px solid var(--border); color: var(--text-muted); padding: 1px 7px; border-radius: 99px; }
+.tabActive .tabCount { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+/* ── Barra de meta (montos, solo autorizados) ── */
+.metaCard { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 18px 20px; margin-bottom: 18px; }
+.metaTop { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.metaAmounts { display: flex; align-items: baseline; gap: 6px; }
+.metaCollected { font-size: 24px; font-weight: 800; color: var(--text-primary); }
+.metaGoal { font-size: 13px; color: var(--text-muted); }
+.metaRight { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-muted); }
+.metaMissing { font-weight: 700; color: var(--accent); }
+.metaBarTrack { width: 100%; height: 10px; border-radius: 99px; background: var(--bg-hover); overflow: hidden; }
+.metaBarFill { height: 100%; border-radius: 99px; background: var(--accent); transition: width .3s ease; }
+.metaBarFillDone { background: var(--success); }
+.editMetaBtn { border: none; background: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; padding: 3px; }
+.editMetaBtn:hover { color: var(--accent); }
+.metaEditRow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.metaEditInput { width: 130px; padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary); font-size: 13px; }
+
+/* ── Tabla ── */
+.tableWrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: auto; }
+.table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 760px; }
+.table th, .table td { border-bottom: 1px solid var(--border); padding: 10px 12px; text-align: left; }
+.table thead th { background: var(--bg-hover); color: var(--text-secondary); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; position: sticky; top: 0; z-index: 1; }
+.clientCell { font-weight: 700; font-size: 13px; color: var(--text-primary); white-space: nowrap; }
+.cellInput { width: 100%; border: none; background: none; outline: none; font-size: 13px; font-family: inherit; color: var(--text-primary); padding: 4px 2px; }
+.cellInput:focus { background: var(--accent-dim); border-radius: var(--radius-sm); }
+.dateInput { border: none; background: none; outline: none; font-size: 12.5px; color: var(--text-primary); font-family: inherit; }
+.select { width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); font-size: 12.5px; padding: 5px 6px; }
+.amountCell { min-width: 110px; }

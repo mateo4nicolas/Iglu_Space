@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [myDeptIds, setMyDeptIds] = useState([])
+  const [pageAccess, setPageAccess] = useState([])
   const [loading, setLoading] = useState(true)
   const initializedRef = useRef(false)
   const loadingTimerRef = useRef(null)
@@ -41,6 +42,7 @@ export function AuthProvider({ children }) {
         setUser(null)
         setProfile(null)
         setMyDeptIds([])
+        setPageAccess([])
         finishLoading()
       }
     })
@@ -82,11 +84,17 @@ export function AuthProvider({ children }) {
       if (error || !prof) {
         setProfile(null)
         setMyDeptIds([])
+        setPageAccess([])
         finishLoading()
         return
       }
 
       setProfile(prof)
+
+      // Acceso a pestañas específicas concedido por admin/supervisor — best effort
+      supabase.from('page_access').select('page').eq('user_id', userId)
+        .then(({ data }) => { if (mountedRef.current) setPageAccess((data || []).map(r => r.page)) })
+        .catch(() => { if (mountedRef.current) setPageAccess([]) })
 
       // Department membership — best effort, never blocks the UI
       try {
@@ -149,8 +157,17 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
   }
 
+  // admin/supervisor siempre tienen acceso a todo; el resto solo si fue concedido explícitamente
+  function hasPageAccess(page) {
+    return isAdmin || pageAccess.includes(page)
+  }
+
+  // Cobro Clientes es más restrictivo: por defecto solo Admin (is_super_admin),
+  // no supervisores. Un admin puede dar acceso puntual vía page_access.
+  const hasFinancialAccess = isSuperAdmin || pageAccess.includes('cobro_clientes')
+
   return (
-    <AuthContext.Provider value={{ user, profile, isAdmin, isSuperAdmin, myDeptIds, loading, signOut }}>
+    <AuthContext.Provider value={{ user, profile, isAdmin, isSuperAdmin, myDeptIds, pageAccess, hasPageAccess, hasFinancialAccess, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   )

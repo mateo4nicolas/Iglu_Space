@@ -4,7 +4,10 @@ import { useAuth } from '../../context/AuthContext'
 import NotificationBell from '../ui/NotificationBell'
 import styles from './Sidebar.module.css'
 
-const adminNav = [
+const cronogramaContenidosItem = { to: '/cronograma-contenidos', icon: ContentCalendarIcon, label: 'Informe de Contenidos' }
+const cobroClientesItem = { to: '/cobro-clientes', icon: MoneyIcon, label: 'Cobro Clientes' }
+
+const adminNavBase = [
   { to: '/dashboard',     icon: HomeIcon,     label: 'Inicio' },
   { to: '/cronograma',    icon: CalendarIcon,  label: 'Cronograma' },
   { to: '/departamentos', icon: DeptIcon,      label: 'Departamentos' },
@@ -19,7 +22,7 @@ const adminNav = [
   { to: '/configuracion', icon: SettingsIcon,  label: 'Configuración' },
 ]
 
-const userNav = [
+const userNavBase = [
   { to: '/dashboard',     icon: HomeIcon,     label: 'Inicio' },
   { to: '/cronograma',    icon: CalendarIcon,  label: 'Cronograma' },
   { to: '/departamentos', icon: DeptIcon,      label: 'Departamentos' },
@@ -31,9 +34,17 @@ const userNav = [
 ]
 
 export default function Sidebar() {
-  const { profile, isAdmin, isSuperAdmin, signOut } = useAuth()
+  const { profile, isAdmin, isSuperAdmin, hasPageAccess, hasFinancialAccess, signOut } = useAuth()
   const navigate = useNavigate()
-  const navItems = isAdmin ? adminNav : userNav
+
+  const base = isAdmin ? adminNavBase : userNavBase
+  const extras = []
+  if (isAdmin || hasPageAccess('cronograma_contenidos')) extras.push(cronogramaContenidosItem)
+  if (hasFinancialAccess) extras.push(cobroClientesItem)
+  const insertAt = base.findIndex(item => item.to === '/contenido-extra') + 1
+  const navItems = extras.length
+    ? [...base.slice(0, insertAt), ...extras, ...base.slice(insertAt)]
+    : base
   const displayName = profile?.username || profile?.display_name || profile?.full_name || 'Usuario'
   const [open, setOpen] = useState(false)
 
@@ -107,6 +118,8 @@ function ClientsIcon()  { return <svg width="15" height="15" viewBox="0 0 20 20"
 function MatrizIcon()   { return <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="2.5" width="15" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><path d="M2.5 8h15M2.5 13h15M8 2.5v15M13 2.5v15" stroke="currentColor" strokeWidth="1.2"/></svg> }
 function AgendaIcon()   { return <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 8h14M7 2v4M13 2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M6.5 11h2M6.5 13.5h4M11.5 11h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> }
 function ExtraIcon()    { return <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4" width="15" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M6.5 8h7M6.5 11.5h4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M10 1.5v2.2M10 16.3v2.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
+function ContentCalendarIcon() { return <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 8h14M7 2v4M13 2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M6.5 11.5h2.5M11 11.5h2.5M6.5 14h2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> }
+function MoneyIcon() { return <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.2" stroke="currentColor" strokeWidth="1.5"/><path d="M10 6v8M12.3 8.1c0-1-.9-1.6-2.3-1.6-1.5 0-2.4.7-2.4 1.7 0 2.4 4.8.9 4.8 3.3 0 1-1 1.7-2.4 1.7-1.4 0-2.4-.6-2.4-1.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
 function AdminIcon()    { return <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M10 2l1.5 4.5H16l-3.5 2.5 1.5 4.5L10 11l-4 2.5 1.5-4.5L4 6.5h4.5L10 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> }
 function SettingsIcon() { return <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" strokeWidth="1.5"/><path d="M10 2.5v2M10 15.5v2M17.5 10h-2M4.5 10h-2M15.1 4.9l-1.4 1.4M6.3 13.7l-1.4 1.4M15.1 15.1l-1.4-1.4M6.3 6.3L4.9 4.9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> }
 function LogoutIcon()   { return <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M13 3h4v14h-4M9 14l4-4-4-4M13 10H3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> }

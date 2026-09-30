@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
-import { ProtectedRoute, AdminRoute, PublicOnlyRoute } from './components/auth/RouteGuards'
+import { ProtectedRoute, AdminRoute, PublicOnlyRoute, PageAccessRoute, FinancialAccessRoute } from './components/auth/RouteGuards'
 import AppLayout from './components/layout/AppLayout'
 import Login from './components/auth/Login'
 import Dashboard from './pages/Dashboard'
@@ -15,6 +15,8 @@ import ClientesPage from './pages/Clientes'
 import MatrizPage from './pages/Matriz'
 import AgendaGestionPage from './pages/AgendaGestion'
 import ContenidoExtraPage from './pages/ContenidoExtra'
+import CronogramaContenidosPage from './pages/CronogramaContenidos'
+import CobroClientesPage from './pages/CobroClientes'
 import ConfiguracionPage from './pages/Configuracion'
 import ToastContainer from './components/ui/Toast'
 
@@ -34,6 +36,8 @@ export default function App() {
             <Route path="/clientes"      element={<AdminRoute><ClientesPage /></AdminRoute>} />
             <Route path="/matriz"        element={<MatrizPage />} />
             <Route path="/contenido-extra" element={<ContenidoExtraPage />} />
+            <Route path="/cronograma-contenidos" element={<PageAccessRoute page="cronograma_contenidos"><CronogramaContenidosPage /></PageAccessRoute>} />
+            <Route path="/cobro-clientes" element={<FinancialAccessRoute><CobroClientesPage /></FinancialAccessRoute>} />
             <Route path="/agenda-gestion" element={<AdminRoute><AgendaGestionPage /></AdminRoute>} />
             <Route path="/equipo"        element={<AdminRoute><EquipoPage /></AdminRoute>} />
             <Route path="/admin"         element={<AdminRoute><AdminPage /></AdminRoute>} />

@@ -5,6 +5,7 @@ import { useSchedule } from '../hooks/useSchedule'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import styles from './Dashboard.module.css'
+import MetaProgressBar from '../components/ui/MetaProgressBar'
 
 export default function Dashboard() {
   const { profile, isAdmin } = useAuth()
@@ -66,6 +67,8 @@ export default function Dashboard() {
           <span className="badge badge-admin" style={{ fontSize: 12 }}>Vista Admin</span>
         )}
       </div>
+
+      <MetaProgressBar style={{ marginTop: -10, marginBottom: 18 }} />
 
       {isAdmin ? (
         <div className={styles.statsGrid}>

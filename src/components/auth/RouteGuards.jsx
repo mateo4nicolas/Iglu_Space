@@ -32,6 +32,22 @@ export function AdminRoute({ children }) {
   return children
 }
 
+export function PageAccessRoute({ page, children }) {
+  const { user, hasPageAccess, loading } = useAuth()
+  if (loading) return <Spinner />
+  if (!user) return <Navigate to="/login" replace />
+  if (!hasPageAccess(page)) return <Navigate to="/dashboard" replace />
+  return children
+}
+
+export function FinancialAccessRoute({ children }) {
+  const { user, hasFinancialAccess, loading } = useAuth()
+  if (loading) return <Spinner />
+  if (!user) return <Navigate to="/login" replace />
+  if (!hasFinancialAccess) return <Navigate to="/dashboard" replace />
+  return children
+}
+
 export function PublicOnlyRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <Spinner />

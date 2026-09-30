@@ -195,7 +195,7 @@ export default function ContenidoExtraPage() {
               <th className={styles.groupHeader}></th>
             </tr>
             <tr>
-              <th className={styles.colHeader}>{labelFor('col_cliente')}</th>
+              <th className={`${styles.colHeader} ${styles.stickyColHead}`}>{labelFor('col_cliente')}</th>
               <th className={styles.colHeader}>{labelFor('col_formato')}</th>
               <th className={styles.colHeader}>{labelFor('col_solicita')}</th>
               <th className={styles.colHeader}>{labelFor('col_fecha_solicitud')}</th>
@@ -221,7 +221,7 @@ export default function ContenidoExtraPage() {
             )}
             {rowsForMes.map(row => (
               <tr key={row.id} className={styles.row}>
-                <td className={styles.cell}>
+                <td className={`${styles.cell} ${styles.stickyCol}`}>
                   <div className={styles.clientCellWrap}>
                     <TextCell value={row.cliente} placeholder="Cliente" onChange={patch(row.id, 'cliente')} />
                     <button className={styles.deleteBtn} title="Eliminar fila" onClick={() => handleDelete(row.id)}>

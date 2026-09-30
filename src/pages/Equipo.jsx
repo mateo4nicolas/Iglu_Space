@@ -9,6 +9,8 @@ export default function EquipoPage() {
   const [profiles, setProfiles] = useState([])
   const [departments, setDepartments] = useState([])
   const [profileDepts, setProfileDepts] = useState({}) // { userId: [deptId, ...] }
+  const [cronogramaAccess, setCronogramaAccess] = useState([]) // [userId, ...] con acceso concedido a Cronograma de Contenidos
+  const [cobroAccess, setCobroAccess] = useState([]) // [userId, ...] con acceso concedido a Cobro Clientes
   const [loading, setLoading] = useState(true)
   const [editingDepts, setEditingDepts] = useState(null)  // userId being edited for depts
   const [editingName, setEditingName] = useState(null)
@@ -23,10 +25,12 @@ export default function EquipoPage() {
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
-    const [{ data: p }, { data: d }, { data: pd }] = await Promise.all([
+    const [{ data: p }, { data: d }, { data: pd }, { data: pa }, { data: fa }] = await Promise.all([
       supabase.from('profiles').select('*, departments(id, name, color)').order('full_name'),
       supabase.from('departments').select('*').order('name'),
       supabase.from('profile_departments').select('user_id, department_id, departments(id, name, color)'),
+      supabase.from('page_access').select('user_id').eq('page', 'cronograma_contenidos'),
+      supabase.from('page_access').select('user_id').eq('page', 'cobro_clientes'),
     ])
     setProfiles(p || [])
     setDepartments(d || [])
@@ -37,7 +41,29 @@ export default function EquipoPage() {
       map[r.user_id].push(r.department_id)
     })
     setProfileDepts(map)
+    setCronogramaAccess((pa || []).map(r => r.user_id))
+    setCobroAccess((fa || []).map(r => r.user_id))
     setLoading(false)
+  }
+
+  async function toggleCobroAccess(userId) {
+    const has = cobroAccess.includes(userId)
+    if (has) {
+      await supabase.from('page_access').delete().eq('user_id', userId).eq('page', 'cobro_clientes')
+    } else {
+      await supabase.from('page_access').insert({ user_id: userId, page: 'cobro_clientes', granted_by: myProfile?.id || null })
+    }
+    fetchAll()
+  }
+
+  async function toggleCronogramaAccess(userId) {
+    const has = cronogramaAccess.includes(userId)
+    if (has) {
+      await supabase.from('page_access').delete().eq('user_id', userId).eq('page', 'cronograma_contenidos')
+    } else {
+      await supabase.from('page_access').insert({ user_id: userId, page: 'cronograma_contenidos', granted_by: myProfile?.id || null })
+    }
+    fetchAll()
   }
 
   async function updateRole(id, role) {
@@ -209,6 +235,28 @@ export default function EquipoPage() {
                       <DeptIcon /> Departamentos
                     </button>
                   )
+                )}
+
+                {isAdmin && !p.is_super_admin && p.role !== 'admin' && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, padding: '5px 10px', color: cronogramaAccess.includes(p.id) ? 'var(--accent)' : undefined }}
+                    onClick={() => toggleCronogramaAccess(p.id)}
+                    title="Dar o quitar acceso a la pestaña Informe de Contenidos"
+                  >
+                    {cronogramaAccess.includes(p.id) ? '✓ Informe Contenidos' : '+ Informe Contenidos'}
+                  </button>
+                )}
+
+                {isSuperAdmin && !p.is_super_admin && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, padding: '5px 10px', color: cobroAccess.includes(p.id) ? 'var(--accent)' : undefined }}
+                    onClick={() => toggleCobroAccess(p.id)}
+                    title="Dar o quitar acceso a la pestaña Cobro Clientes (ve y modifica montos)"
+                  >
+                    {cobroAccess.includes(p.id) ? '✓ Cobro Clientes' : '+ Cobro Clientes'}
+                  </button>
                 )}
 
                 {isAdmin && p.id !== myProfile?.id && (

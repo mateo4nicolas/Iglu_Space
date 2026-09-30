@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase'
 import TaskModal from '../components/tasks/TaskModal'
 import { cycleLabel } from '../utils/cycleLabel'
 import styles from './Cronograma.module.css'
+import MetaProgressBar from '../components/ui/MetaProgressBar'
 
 export default function CronogramaPage() {
   const { isAdmin } = useAuth()
@@ -119,6 +120,7 @@ export default function CronogramaPage() {
               <PlusIcon /> Asignar pendiente
             </button>
           )}
+          <MetaProgressBar />
         </div>
       </div>
 
