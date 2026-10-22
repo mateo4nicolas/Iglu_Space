@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale'
 import styles from './TaskModal.module.css'
 import { cycleLabelLower } from '../../utils/cycleLabel'
 import ClientResumenLinks from './ClientResumenLinks'
+import { sharedMembers, memberSentAt, sharedSentCount } from '../../utils/sharedTask'
 
 const PERIOD_LABELS = { '1_31': '1 al 31', '15_14': '15 al 14' }
 
@@ -48,6 +49,11 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
   const [allowedDepts, setAllowedDepts] = useState(task?.transfer_to_dept_ids || [])
   const [allowTransfer, setAllowTransfer] = useState(task?.allow_transfer || false)
 
+  // Tarea compartida
+  const [sharedOn, setSharedOn] = useState(!!task?.is_shared)
+  const [sharedWith, setSharedWith] = useState(task?.shared_with || [])
+  const [deptMembers, setDeptMembers] = useState([])
+
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   useEffect(() => {
@@ -82,6 +88,16 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
     })
     setAllowTransfer(task.allow_transfer || false)
     setAllowedDepts(task.transfer_to_dept_ids || [])
+    setSharedOn(!!task.is_shared)
+    setSharedWith(task.shared_with || [])
+    if (task.department_id) {
+      supabase.from('profile_departments')
+        .select('user_id, profiles(id, full_name, display_name, username)')
+        .eq('department_id', task.department_id)
+        .then(({ data }) => setDeptMembers((data || []).map(r => r.profiles).filter(Boolean)))
+    } else {
+      setDeptMembers([])
+    }
     supabase.from('profiles').select('id, full_name, display_name, username').then(({ data }) => setProfiles(data || []))
     supabase.from('clients').select('id, brand_name, billing_period').eq('is_active', true).order('brand_name').then(({ data }) => setClients(data || []))
     supabase.from('columnas_matriz').select('*').eq('is_active', true).order('position').then(({ data }) => setMatrizCols(data || []))
@@ -301,8 +317,18 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
       ...editData,
       allow_transfer: allowTransfer,
       transfer_to_dept_ids: allowTransfer ? allowedDepts : [],
+      ...sharedPayload(),
     })
     setEditing(false)
+  }
+
+  function toggleSharedUser(id) {
+    setSharedWith(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
+  }
+
+  function sharedPayload() {
+    const list = sharedOn ? sharedWith.filter(id => id && id !== editData.assigned_to) : []
+    return { is_shared: list.length > 0, shared_with: list }
   }
 
   async function executeTransfer() {
@@ -381,6 +407,9 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
             {isPending && isAdmin && !task.is_finished && <span className="badge badge-warning">Pendiente aprobación</span>}
             {task.allow_transfer && (
               <span className="badge badge-info" style={{ fontSize: 10 }}>🔀 Transferible</span>
+            )}
+            {task.is_shared && (
+              <span className="badge badge-info" style={{ fontSize: 10 }}>👥 Compartida</span>
             )}
           </div>
           <button className={styles.closeBtn} onClick={onClose}><CloseIcon /></button>
@@ -612,6 +641,25 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
                 </select>
               ) : <span className={styles.metaVal}>{nameFor(task.profiles) || <span className={styles.muted}>Sin asignar</span>}</span>}
             </div>
+            {task.is_shared && !editing && (
+              <div className={styles.metaItem}>
+                <span className={styles.metaLabel}>
+                  Compartida · {sharedSentCount(task).sent}/{sharedSentCount(task).total} enviadas
+                </span>
+                {sharedMembers(task).map(uid => {
+                  const p = profiles.find(x => x.id === uid)
+                  const sentAt = memberSentAt(task, uid)
+                  return (
+                    <div key={uid} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12 }}>
+                      <span className={styles.metaVal}>{nameFor(p) || '—'}</span>
+                      {sentAt
+                        ? <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ {format(new Date(sentAt), 'd MMM, HH:mm', { locale: es })}</span>
+                        : <span className={styles.muted}>Pendiente</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
             <div className={styles.metaItem}>
               <span className={styles.metaLabel}>Cliente</span>
               {editing ? (
@@ -697,6 +745,47 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
               <div className={styles.editActions}>
                 {editing ? (
                   <>
+                    {/* Shared toggle (admin only in edit mode) */}
+                    {isAdmin && (
+                      <div className={styles.transferConfig}>
+                        <label className={styles.transferToggleRow}>
+                          <input
+                            type="checkbox"
+                            checked={sharedOn}
+                            onChange={e => setSharedOn(e.target.checked)}
+                            style={{ accentColor: 'var(--accent)', width: 14, height: 14 }}
+                          />
+                          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>
+                            Tarea compartida
+                          </span>
+                        </label>
+                        {sharedOn && (
+                          <div className={styles.deptPickerWrap}>
+                            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '6px 0 4px' }}>
+                              Compartir con (llega a revisión cuando todos la manden):
+                            </p>
+                            <div className={styles.miniDeptGrid}>
+                              {(deptMembers.length > 0 ? deptMembers : profiles)
+                                .filter(p => p.id !== editData.assigned_to)
+                                .map(p => {
+                                  const sel = sharedWith.includes(p.id)
+                                  return (
+                                    <button
+                                      key={p.id}
+                                      type="button"
+                                      className={`${styles.miniDeptChip} ${sel ? styles.miniDeptSel : ''}`}
+                                      style={sel ? { borderColor: 'var(--accent)', background: 'var(--accent-dim)', color: 'var(--accent)' } : {}}
+                                      onClick={() => toggleSharedUser(p.id)}
+                                    >
+                                      {nameFor(p)}{sel ? ' ✓' : ''}
+                                    </button>
+                                  )
+                                })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {/* Transfer toggle (admin only in edit mode) */}
                     {isAdmin && (
                       <div className={styles.transferConfig}>

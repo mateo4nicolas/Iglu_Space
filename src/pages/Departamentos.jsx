@@ -8,6 +8,7 @@ import TaskModal from '../components/tasks/TaskModal'
 import CreateTaskModal from '../components/tasks/CreateTaskModal'
 import ColumnSettings from '../components/tasks/ColumnSettings'
 import { cycleLabel, currentMesBase } from '../utils/cycleLabel'
+import { sharedSentCount } from '../utils/sharedTask'
 import styles from './Departamentos.module.css'
 
 export default function DepartamentosPage() {
@@ -501,6 +502,14 @@ function TaskCard({ task, isAdmin, onClick, getOppositeColumns, onMove }) {
         <p className={styles.cardTitle}>{task.title}</p>
         {task.description && <p className={styles.cardDesc}>{task.description}</p>}
         {task.allow_transfer && !task.is_finished && <span style={{ fontSize: 9, color: 'var(--info)', marginTop: 2, display: 'block' }}>🔀 Transferible</span>}
+        {task.is_shared && (() => {
+          const { sent, total } = sharedSentCount(task)
+          return (
+            <span style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2, display: 'block', fontWeight: 600 }}>
+              👥 Compartida · {sent}/{total} enviadas
+            </span>
+          )
+        })()}
         <div className={styles.cardFooter}>
           {assigneeName && <div className={styles.cardAvatar} title={assigneeName}>{assigneeName[0].toUpperCase()}</div>}
           <div

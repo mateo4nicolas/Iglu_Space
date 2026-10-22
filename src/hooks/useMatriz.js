@@ -6,6 +6,7 @@ const TASK_SELECT = `
   cliente_id, periodo, columna_matriz, column_id, department_id, mes_tarea,
   assigned_to, created_by, created_at, updated_at,
   allow_transfer, transfer_to_dept_ids,
+  is_shared, shared_with, shared_progress,
   profiles!tasks_assigned_to_fkey(id, full_name, display_name, username),
   kanban_columns(id, title, color, owner_role),
   departments(id, name, color),
