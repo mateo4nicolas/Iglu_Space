@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import styles from './TaskModal.module.css'
 import { cycleLabelLower } from '../../utils/cycleLabel'
+import ClientResumenLinks from './ClientResumenLinks'
 
 const PERIOD_LABELS = { '1_31': '1 al 31', '15_14': '15 al 14' }
 
@@ -400,6 +401,7 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
               ) : (
                 <p className={styles.desc}>{task.description || <span className={styles.muted}>Sin descripción</span>}</p>
               )}
+              <ClientResumenLinks clienteId={editing ? editData.cliente_id : task.cliente_id} />
             </div>
 
             <div className={styles.section}>

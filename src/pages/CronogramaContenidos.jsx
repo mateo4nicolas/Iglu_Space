@@ -18,9 +18,21 @@ const NET_HEAD = { fb: styles.hdFb, ig: styles.hdIg, tt: styles.hdTt }
 const NET_HEAD_SOFT = { fb: styles.hdFbSoft, ig: styles.hdIgSoft, tt: styles.hdTtSoft }
 const AUTO_APROB_SECTIONS = ['fria', 'caliente'] // conectadas en vivo a la Matriz
 
+function parseDay(v) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v))
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(v)
+}
+// Valor para <input type="date">: fecha manual tal cual; fecha automática (con hora) en día local
+function toLocalDateInput(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p2 = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
+}
 function fmtDate(iso) {
   if (!iso) return null
-  const d = new Date(iso)
+  const d = parseDay(iso)
   if (Number.isNaN(d.getTime())) return null
   return d.toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
@@ -90,7 +102,9 @@ function BufferedField({ value, onCommit, className, placeholder, as = 'input', 
 }
 
 export default function CronogramaContenidosPage() {
-  const { isAdmin } = useAuth()
+  const { hasPageAccess } = useAuth()
+  // Admin siempre; otra persona solo si un admin le dio el permiso de Estructura (en Equipo)
+  const canEditStructure = hasPageAccess('cronograma_estructura')
   const {
     loading, clientsByPeriod, getConfig, saveConfig, sectionsForClient, networksForClient,
     hasVectorColumn, rowsFor, allRowsFor, addRow, ensureSeeded, updateRow, deleteRow,
@@ -158,7 +172,7 @@ export default function CronogramaContenidosPage() {
               mes={mesAno}
               period={period}
               periodLabel={cycleLabel(mesAno, period)}
-              isAdmin={isAdmin}
+              canEditStructure={canEditStructure}
               config={getConfig(activeClient.id)}
               sections={sectionsForClient(activeClient.id)}
               networks={networksForClient(activeClient.id)}
@@ -193,7 +207,7 @@ const GRUPO_FACTURACION = {
 }
 
 function ClientPanel({
-  client, mes, period, periodLabel, isAdmin, config, sections, networks, hasVector,
+  client, mes, period, periodLabel, canEditStructure, config, sections, networks, hasVector,
   rowsFor, allRowsFor, addRow, ensureSeeded, updateRow, deleteRow, actividadFecha, actividadNota, saveActividadNota,
   aprobacionFilaFecha, saveConfig, onOpenConfig, showConfig, onCloseConfig, showResumen, onToggleResumen,
 }) {
@@ -339,7 +353,7 @@ function ClientPanel({
               </span>
             ))}
           </div>
-          {isAdmin && (
+          {canEditStructure && (
             <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onOpenConfig}>
               <GearIcon /> Estructura
             </button>
@@ -404,7 +418,7 @@ function ClientPanel({
         </div>
       </div>
 
-      {showConfig && (
+      {canEditStructure && showConfig && (
         <ConfigModal client={client} config={config} onSave={saveConfig} onClose={onCloseConfig} />
       )}
     </div>
@@ -424,9 +438,10 @@ function buildResumenRows(clientId, mes, sections, networks, allRowsFor, aprobac
     const countByTipo = {}
     rows.forEach(r => {
       const idx = r.tipo ? (countByTipo[r.tipo] = (countByTipo[r.tipo] ?? -1) + 1) : null
-      const aprobacionFecha = AUTO_APROB_SECTIONS.includes(sec.id) && r.tipo
+      const manualAprob = r.aprobacion_fecha ? String(r.aprobacion_fecha).slice(0, 10) : null
+      const aprobacionFecha = manualAprob || (AUTO_APROB_SECTIONS.includes(sec.id) && r.tipo
         ? aprobacionFilaFecha(clientId, mes, sec.id, r.tipo, idx)
-        : r.aprobacion_fecha
+        : null)
       out.push({
         seccionId: sec.id,
         seccionLabel: sec.label,
@@ -448,11 +463,6 @@ function ResumenView({ client, period, periodLabel, data }) {
   return (
     <div className={styles.resumenOuter}>
       <div className={styles.resumenPage}>
-        <div className={`${styles.resumenBlob} ${styles.resumenBlobTL1}`} />
-        <div className={`${styles.resumenBlob} ${styles.resumenBlobTL2}`} />
-        <div className={`${styles.resumenBlob} ${styles.resumenBlobBR1}`} />
-        <div className={`${styles.resumenBlob} ${styles.resumenBlobBR2}`} />
-        <div className={styles.resumenLogo}><BrandLogo /></div>
         <div className={styles.resumenContent}>
           <div className={styles.resumenTitle}>Informe de contenidos y programación</div>
           <div className={styles.resumenMeta}>
@@ -487,21 +497,6 @@ function ResumenView({ client, period, periodLabel, data }) {
         </div>
       </div>
     </div>
-  )
-}
-
-// Aproximación decorativa tipo isotipo en espiral de colores — reemplázalo por el
-// logo real (SVG/PNG) cuando lo tengas a mano, es solo un marcador visual.
-function BrandLogo() {
-  return (
-    <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-      <circle cx="26" cy="14" r="9" fill="#F2A9C8" />
-      <circle cx="37" cy="24" r="8" fill="#C9A3E0" />
-      <circle cx="32" cy="37" r="7.5" fill="#8FC3DE" />
-      <circle cx="18" cy="35" r="7" fill="#F4C77E" />
-      <circle cx="14" cy="21" r="6.5" fill="#F08A9B" />
-      <circle cx="26" cy="26" r="5" fill="#ffffff" />
-    </svg>
   )
 }
 
@@ -638,9 +633,6 @@ function SectionRows({ section, clientId, mes, config, hasVector, networks, rows
             )}
             {hasVector && (
               <td className={`${styles.cellEditable} ${styles.colVector}`}>
-                {row.tipo && (
-                  <span className={`${styles.tipoBadge} ${row.tipo === 'video' ? styles.tipoBadgeVideo : styles.tipoBadgePost}`}>{row.tipo === 'video' ? 'Video' : 'Post'}</span>
-                )}
                 <BufferedField className={styles.cellInput} value={row.vector || ''} placeholder="vector" onCommit={v => updateRow(row.id, { vector: v })} />
               </td>
             )}
@@ -654,11 +646,13 @@ function SectionRows({ section, clientId, mes, config, hasVector, networks, rows
               <LinksEditor value={row.enlaces || []} onCommit={v => updateRow(row.id, { enlaces: v })} />
             </td>
             <td className={styles.aprobRO}>
-              {autoAprob && row.tipo ? (
-                fmtDateTime(aprobFecha) ? fmtDateTime(aprobFecha) : <span className={styles.aprobROEmpty}>Sin aprobar</span>
-              ) : (
-                <input type="date" className={styles.dateInput} style={{ padding: 0 }} value={toDateInputValue(row.aprobacion_fecha)} onChange={e => updateRow(row.id, { aprobacion_fecha: e.target.value || null })} />
-              )}
+              <input
+                type="date"
+                className={styles.dateInput}
+                style={{ padding: 0 }}
+                value={row.aprobacion_fecha ? String(row.aprobacion_fecha).slice(0, 10) : toLocalDateInput(aprobFecha)}
+                onChange={e => updateRow(row.id, { aprobacion_fecha: e.target.value || null })}
+              />
             </td>
             {networks.map(n => (
               <Fragment key={n.id}>

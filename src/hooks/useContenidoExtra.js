@@ -101,12 +101,12 @@ export function useContenidoExtra() {
     return () => supabase.removeChannel(channel)
   }, [fetchAll])
 
-  async function addRow(mes) {
+  async function addRow(mes, prefill = {}) {
     const rowsInMes = rows.filter(r => r.mes === mes)
     const maxPos = rowsInMes.reduce((m, r) => Math.max(m, r.position || 0), 0)
     const { data, error } = await supabase
       .from('contenido_extra')
-      .insert({ ...EMPTY_ROW, mes, position: maxPos + 1, created_by: profile?.id || null })
+      .insert({ ...EMPTY_ROW, ...prefill, mes, position: maxPos + 1, created_by: profile?.id || null })
       .select()
       .single()
     if (!error) setRows(prev => [...prev, data])

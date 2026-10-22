@@ -57,3 +57,9 @@ export function shiftMesBase(mesBase, delta) {
   const d = new Date(y, m - 1 + delta, 1)
   return currentMesBase(d)
 }
+
+/** Mes base (YYYY-MM) del ciclo de cobro 15→14 en curso: desde el día 15 es el mes actual; antes del 15, el anterior. */
+export function currentCycleMesBase(date = new Date()) {
+  const base = currentMesBase(date)
+  return date.getDate() >= 15 ? base : shiftMesBase(base, -1)
+}

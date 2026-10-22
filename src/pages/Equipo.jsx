@@ -11,6 +11,7 @@ export default function EquipoPage() {
   const [profileDepts, setProfileDepts] = useState({}) // { userId: [deptId, ...] }
   const [cronogramaAccess, setCronogramaAccess] = useState([]) // [userId, ...] con acceso concedido a Cronograma de Contenidos
   const [cobroAccess, setCobroAccess] = useState([]) // [userId, ...] con acceso concedido a Cobro Clientes
+  const [estructuraAccess, setEstructuraAccess] = useState([]) // [userId, ...] que pueden modificar la estructura del Informe de Contenidos
   const [loading, setLoading] = useState(true)
   const [editingDepts, setEditingDepts] = useState(null)  // userId being edited for depts
   const [editingName, setEditingName] = useState(null)
@@ -25,12 +26,13 @@ export default function EquipoPage() {
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
-    const [{ data: p }, { data: d }, { data: pd }, { data: pa }, { data: fa }] = await Promise.all([
+    const [{ data: p }, { data: d }, { data: pd }, { data: pa }, { data: fa }, { data: ea }] = await Promise.all([
       supabase.from('profiles').select('*, departments(id, name, color)').order('full_name'),
       supabase.from('departments').select('*').order('name'),
       supabase.from('profile_departments').select('user_id, department_id, departments(id, name, color)'),
       supabase.from('page_access').select('user_id').eq('page', 'cronograma_contenidos'),
       supabase.from('page_access').select('user_id').eq('page', 'cobro_clientes'),
+      supabase.from('page_access').select('user_id').eq('page', 'cronograma_estructura'),
     ])
     setProfiles(p || [])
     setDepartments(d || [])
@@ -43,6 +45,7 @@ export default function EquipoPage() {
     setProfileDepts(map)
     setCronogramaAccess((pa || []).map(r => r.user_id))
     setCobroAccess((fa || []).map(r => r.user_id))
+    setEstructuraAccess((ea || []).map(r => r.user_id))
     setLoading(false)
   }
 
@@ -52,6 +55,16 @@ export default function EquipoPage() {
       await supabase.from('page_access').delete().eq('user_id', userId).eq('page', 'cobro_clientes')
     } else {
       await supabase.from('page_access').insert({ user_id: userId, page: 'cobro_clientes', granted_by: myProfile?.id || null })
+    }
+    fetchAll()
+  }
+
+  async function toggleEstructuraAccess(userId) {
+    const has = estructuraAccess.includes(userId)
+    if (has) {
+      await supabase.from('page_access').delete().eq('user_id', userId).eq('page', 'cronograma_estructura')
+    } else {
+      await supabase.from('page_access').insert({ user_id: userId, page: 'cronograma_estructura', granted_by: myProfile?.id || null })
     }
     fetchAll()
   }
@@ -245,6 +258,17 @@ export default function EquipoPage() {
                     title="Dar o quitar acceso a la pestaña Informe de Contenidos"
                   >
                     {cronogramaAccess.includes(p.id) ? '✓ Informe Contenidos' : '+ Informe Contenidos'}
+                  </button>
+                )}
+
+                {isAdmin && !p.is_super_admin && p.role !== 'admin' && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, padding: '5px 10px', color: estructuraAccess.includes(p.id) ? 'var(--accent)' : undefined }}
+                    onClick={() => toggleEstructuraAccess(p.id)}
+                    title="Dar o quitar permiso para modificar la estructura de la tabla en el Informe de Contenidos"
+                  >
+                    {estructuraAccess.includes(p.id) ? '✓ Estructura Informe' : '+ Estructura Informe'}
                   </button>
                 )}
 

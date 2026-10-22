@@ -12,9 +12,15 @@ function joinEs(arr) {
 
 function pctOf(part, total) { return total ? Math.round((part / total) * 100) : 0 }
 
+// Una fecha solo-día (YYYY-MM-DD) se interpreta como día local, no UTC, para no mostrar el día anterior
+function parseDay(v) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v))
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(v)
+}
+
 function fmtDMY(iso) {
   if (!iso) return ''
-  const d = new Date(iso)
+  const d = parseDay(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
@@ -41,7 +47,7 @@ function computeStats(rows, networks) {
   const totalPend = perSection.reduce((a, s) => a + s.pendientes, 0)
 
   const perNet = networks.map(net => {
-    const dates = rows.map(r => r[net.field + '_fecha']).filter(Boolean).map(d => new Date(d)).filter(d => !Number.isNaN(d.getTime()))
+    const dates = rows.map(r => r[net.field + '_fecha']).filter(Boolean).map(d => parseDay(d)).filter(d => !Number.isNaN(d.getTime()))
     const min = dates.length ? new Date(Math.min(...dates)) : null
     const max = dates.length ? new Date(Math.max(...dates)) : null
     return { label: net.label, count: dates.length, min, max }

@@ -7,10 +7,19 @@ export const PAUTA_METODOS = [
   { value: 'transferencia_iglu', label: 'Transferencia a Iglü' },
 ]
 
+// Une una fila en el estado sin duplicarla: la misma fila puede llegar por la edición local
+// (sin id todavía) y por el evento en vivo (con id); se identifican por id o por cliente+mes.
+function mergeRow(prev, row) {
+  const idx = prev.findIndex(r => (row.id && r.id === row.id) || (r.cliente_id === row.cliente_id && r.mes === row.mes))
+  if (idx === -1) return [...prev, row]
+  const next = [...prev]
+  next[idx] = { ...prev[idx], ...row }
+  return next
+}
+
 export function useCobroClientes() {
   const { profile } = useAuth()
   const [clients, setClients] = useState([])
-  const [clientVisibility, setClientVisibility] = useState([])
   const [rows, setRows] = useState([])
   const [meta, setMeta] = useState(15600)
   const [loading, setLoading] = useState(true)
@@ -18,18 +27,15 @@ export function useCobroClientes() {
   const fetchAll = useCallback(async () => {
     const [
       { data: clientsData },
-      { data: visibilityData },
       { data: rowsData },
       { data: configData },
     ] = await Promise.all([
-      supabase.from('clients').select('*').eq('is_active', true).order('brand_name'),
-      supabase.from('matriz_client_visibility').select('*').order('mes', { ascending: true }).order('created_at', { ascending: true }),
+      supabase.from('cobro_lista_clientes').select('*').eq('is_active', true).order('nombre'),
       supabase.from('cobro_clientes').select('*'),
       supabase.from('cobro_config').select('*').eq('id', 'global').maybeSingle(),
     ])
     setClients(clientsData || [])
-    setClientVisibility(visibilityData || [])
-    setRows(rowsData || [])
+    setRows((rowsData || []).reduce((acc, r) => mergeRow(acc, r), []))
     setMeta(configData?.meta != null ? Number(configData.meta) : 15600)
     setLoading(false)
   }, [])
@@ -38,36 +44,37 @@ export function useCobroClientes() {
     fetchAll()
     const channel = supabase
       .channel('cobro-clientes-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matriz_client_visibility' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cobro_lista_clientes' }, fetchAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cobro_config' }, fetchAll)
       // cobro_clientes se edita campo a campo: aplicar el cambio puntual en vez de
       // volver a pedir todo, para no pisar lo que la persona está escribiendo.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cobro_clientes' }, payload => {
         if (payload.eventType === 'DELETE') { setRows(prev => prev.filter(r => r.id !== payload.old.id)); return }
-        setRows(prev => {
-          const exists = prev.some(r => r.id === payload.new.id)
-          return exists ? prev.map(r => (r.id === payload.new.id ? payload.new : r)) : [...prev, payload.new]
-        })
+        setRows(prev => mergeRow(prev, payload.new))
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [fetchAll])
 
-  function isClientActiveInMonth(clientId, mes) {
-    const entries = clientVisibility.filter(v => v.cliente_id === clientId && v.mes <= mes)
-    if (entries.length === 0) return true
-    return entries[entries.length - 1].active
+  // Lista propia de Cobro Clientes: independiente de la Matriz y del resto de la plataforma
+  function allActiveClients() {
+    return clients
   }
 
-  function clientsByPeriod(period, mes) {
-    return clients.filter(c => c.billing_period === period && (!mes || isClientActiveInMonth(c.id, mes)))
+  async function addClient(nombre) {
+    const name = (nombre || '').trim()
+    if (!name) return { error: new Error('Nombre vacío') }
+    const { error } = await supabase.from('cobro_lista_clientes').insert({ nombre: name, created_by: profile?.id || null })
+    if (!error) fetchAll()
+    return { error }
   }
 
-  // Todos los clientes activos del ciclo de cobro (15 a 14), sin separar por
-  // billing_period: el cobro se sigue en una sola tabla para todos.
-  function allActiveClients(mes) {
-    return clients.filter(c => !mes || isClientActiveInMonth(c.id, mes))
+  async function removeClient(clienteId) {
+    setClients(prev => prev.filter(c => c.id !== clienteId))
+    setRows(prev => prev.filter(r => r.cliente_id !== clienteId))
+    const { error } = await supabase.from('cobro_lista_clientes').delete().eq('id', clienteId)
+    if (error) fetchAll()
+    return { error }
   }
 
   function rowFor(clienteId, mes) {
@@ -81,20 +88,22 @@ export function useCobroClientes() {
     delete merged.updated_at
     if (!current) merged.created_by = profile?.id || null
 
-    setRows(prev => {
-      const exists = prev.some(r => r.cliente_id === clienteId && r.mes === mes)
-      return exists
-        ? prev.map(r => (r.cliente_id === clienteId && r.mes === mes ? { ...r, ...merged } : r))
-        : [...prev, merged]
-    })
-    const { error } = await supabase.from('cobro_clientes').upsert(merged, { onConflict: 'cliente_id,mes' })
+    setRows(prev => mergeRow(prev, merged))
+    const { data, error } = await supabase
+      .from('cobro_clientes')
+      .upsert(merged, { onConflict: 'cliente_id,mes' })
+      .select('id')
+      .single()
     if (error) fetchAll()
+    else if (data?.id) setRows(prev => mergeRow(prev, { cliente_id: clienteId, mes, id: data.id }))
     return { error }
   }
 
   // Total recaudado del mes = solo lo registrado en "Pago de agencia" (ambos ciclos)
   function totalAgenciaMes(mes) {
-    return rows.filter(r => r.mes === mes).reduce((sum, r) => sum + (Number(r.pago_agencia) || 0), 0)
+    // Una sola fila por cliente y mes: nunca se cuenta dos veces el mismo pago
+    const unicas = rows.filter(r => r.mes === mes).reduce((acc, r) => mergeRow(acc, r), [])
+    return unicas.reduce((sum, r) => sum + (Number(r.pago_agencia) || 0), 0)
   }
 
   function pctForMes(mes) {
@@ -112,9 +121,9 @@ export function useCobroClientes() {
   return {
     loading,
     clients,
-    clientsByPeriod,
     allActiveClients,
-    isClientActiveInMonth,
+    addClient,
+    removeClient,
     rowFor,
     saveRow,
     meta,

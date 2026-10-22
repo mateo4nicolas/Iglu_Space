@@ -128,14 +128,8 @@
 /* ── Resumen interpretativo: hoja con fondo decorativo, siempre en blanco (para verse igual en el PDF sin importar el tema) ── */
 .resumenToggle { display: flex; align-items: center; gap: 6px; }
 .resumenOuter { border-bottom: 1px solid var(--border); background: #f3f4f7; padding: 24px; display: flex; justify-content: center; }
-.resumenPage { position: relative; overflow: hidden; background: #ffffff; width: 780px; max-width: 100%; min-height: 1040px; padding: 56px 60px; box-sizing: border-box; color: #182036; box-shadow: 0 2px 18px rgba(0,0,0,0.08); border-radius: 4px; }
-.resumenBlob { position: absolute; border-radius: 50%; pointer-events: none; }
-.resumenBlobTL1 { top: -130px; left: -150px; width: 420px; height: 420px; background: radial-gradient(circle at 35% 35%, rgba(240,150,190,0.55), rgba(240,150,190,0) 72%); }
-.resumenBlobTL2 { top: -70px; left: 30px; width: 300px; height: 300px; background: radial-gradient(circle at 45% 45%, rgba(190,160,230,0.45), rgba(190,160,230,0) 72%); }
-.resumenBlobBR1 { bottom: -150px; right: -170px; width: 480px; height: 480px; background: radial-gradient(circle at 60% 60%, rgba(110,190,215,0.5), rgba(110,190,215,0) 72%); }
-.resumenBlobBR2 { bottom: -50px; right: 70px; width: 300px; height: 300px; background: radial-gradient(circle at 50% 50%, rgba(250,210,150,0.4), rgba(250,210,150,0) 72%); }
+.resumenPage { position: relative; background: #ffffff url('/plantilla-informe.png') top center / 100% auto repeat-y; width: 780px; max-width: 100%; aspect-ratio: 1055 / 1491; padding: 115px 60px 125px; box-sizing: border-box; color: #182036; box-shadow: 0 2px 18px rgba(0,0,0,0.08); border-radius: 4px; }
 .resumenContent { position: relative; z-index: 1; }
-.resumenLogo { position: absolute; top: 44px; right: 54px; z-index: 2; }
 .resumenTitle { font-weight: 800; font-size: 23px; text-align: center; color: #182036; margin: 4px 90px 30px 0; }
 .resumenMeta { font-size: 13px; line-height: 1.9; margin-bottom: 16px; }
 .resumenMeta div { color: #2b3242; }

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useCobroClientes, PAUTA_METODOS } from '../hooks/useCobroClientes'
-import { cycleLabel, currentMesBase, shiftMesBase } from '../utils/cycleLabel'
+import { cycleLabel, currentCycleMesBase, shiftMesBase } from '../utils/cycleLabel'
 import styles from './CobroClientes.module.css'
 
 // El cobro se sigue en un solo ciclo (15 a 14 de cada mes) para todos los
@@ -50,12 +50,13 @@ function BufferedField({ value, onCommit, className, placeholder, type = 'text',
 
 export default function CobroClientesPage() {
   const {
-    loading, allActiveClients, rowFor, saveRow, meta, saveMeta, totalAgenciaMes, pctForMes,
+    loading, allActiveClients, addClient, removeClient, rowFor, saveRow, meta, saveMeta, totalAgenciaMes, pctForMes,
   } = useCobroClientes()
 
-  const [mesAno, setMesAno] = useState(currentMesBase())
+  const [mesAno, setMesAno] = useState(currentCycleMesBase())
   const [editingMeta, setEditingMeta] = useState(false)
   const [metaDraft, setMetaDraft] = useState(meta)
+  const [newClient, setNewClient] = useState('')
 
   useEffect(() => { setMetaDraft(meta) }, [meta])
 
@@ -64,6 +65,19 @@ export default function CobroClientesPage() {
   const visibleClients = allActiveClients(mesAno)
   const pct = pctForMes(mesAno)
   const missing = Math.max(0, meta - totalAgenciaMes(mesAno))
+
+  async function handleAddClient(e) {
+    e.preventDefault()
+    const { error } = await addClient(newClient)
+    if (error) { window.alert('No se pudo agregar el cliente.'); return }
+    setNewClient('')
+  }
+
+  function handleRemoveClient(c) {
+    if (window.confirm(`¿Eliminar a "${c.nombre}" de Cobro Clientes? Se borrarán también sus pagos registrados. Esto no afecta a otros módulos.`)) {
+      removeClient(c.id)
+    }
+  }
 
   function handleSaveMeta() {
     const n = Number(metaDraft)
@@ -77,7 +91,7 @@ export default function CobroClientesPage() {
       <div className={styles.topbar}>
         <div>
           <h1 className={styles.pageTitle}>Cobro Clientes</h1>
-          <p className={styles.pageSubtitle}>Seguimiento de pagos por cliente del 15 al 14 de cada mes, conectado con Matriz de Control</p>
+          <p className={styles.pageSubtitle}>Seguimiento de pagos por cliente del 15 al 14 de cada mes</p>
         </div>
         <div className={styles.monthNav}>
           <button className={styles.monthNavBtn} onClick={() => setMesAno(m => shiftMesBase(m, -1))} aria-label="Mes anterior"><ChevronLeftIcon /></button>
@@ -111,8 +125,18 @@ export default function CobroClientesPage() {
         )}
       </div>
 
+      <form className={styles.addClientRow} onSubmit={handleAddClient}>
+        <input
+          className={styles.addClientInput}
+          placeholder="Nombre del cliente nuevo"
+          value={newClient}
+          onChange={e => setNewClient(e.target.value)}
+        />
+        <button type="submit" className="btn btn-primary" style={{ fontSize: 12 }} disabled={!newClient.trim()}>+ Agregar cliente</button>
+      </form>
+
       {visibleClients.length === 0 ? (
-        <div className={styles.empty}>No hay clientes activos en este ciclo (revisa "Pausar cliente" en Matriz de Control)</div>
+        <div className={styles.empty}>Aún no hay clientes en Cobro Clientes. Agrega el primero arriba.</div>
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -123,11 +147,12 @@ export default function CobroClientesPage() {
                 <th className={styles.amountCell}>Pago de agencia</th>
                 <th className={styles.amountCell}>Pago de pauta</th>
                 <th>Pauta</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {visibleClients.map(c => (
-                <ClientRow key={c.id} client={c} mes={mesAno} rowFor={rowFor} saveRow={saveRow} />
+                <ClientRow key={c.id} client={c} mes={mesAno} rowFor={rowFor} saveRow={saveRow} onRemove={() => handleRemoveClient(c)} />
               ))}
             </tbody>
           </table>
@@ -137,11 +162,11 @@ export default function CobroClientesPage() {
   )
 }
 
-function ClientRow({ client, mes, rowFor, saveRow }) {
+function ClientRow({ client, mes, rowFor, saveRow, onRemove }) {
   const row = rowFor(client.id, mes) || {}
   return (
     <tr>
-      <td className={styles.clientCell}>{client.brand_name}</td>
+      <td className={styles.clientCell}>{client.nombre}</td>
       <td>
         <input
           type="date"
@@ -177,6 +202,9 @@ function ClientRow({ client, mes, rowFor, saveRow }) {
           <option value="">— No aplica —</option>
           {PAUTA_METODOS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
+      </td>
+      <td>
+        <button type="button" className={styles.removeBtn} title="Eliminar cliente de Cobro Clientes" onClick={onRemove}>✕</button>
       </td>
     </tr>
   )

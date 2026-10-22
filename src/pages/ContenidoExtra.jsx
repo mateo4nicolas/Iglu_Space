@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import {
-  useContenidoExtra, currentMesKey,
+  useContenidoExtra, currentMesKey, mesKeyToLabel,
   FORMATO_OPTS, SOLICITA_OPTS, APROBACION_OPTS, DISENADO_OPTS,
   PUBLICACION_OPTS, PRESUPUESTO_OPTS, PAUTA_OPTS,
 } from '../hooks/useContenidoExtra'
 import { useContenidoExtraHeaders, HEADER_GROUPS } from '../hooks/useContenidoExtraHeaders'
+import { downloadXlsx } from '../utils/xlsxExport'
 import styles from './ContenidoExtra.module.css'
 
 function textColorFor(bgHex) {
@@ -115,8 +116,55 @@ export default function ContenidoExtraPage() {
     }
   }, [meses]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const patch = useCallback((id, field) => (val) => updateRow(id, { [field]: val }), [updateRow])
-  const rowsForMes = rows.filter(r => r.mes === activeMes)
+  // Filtros por Tipo (formato) y Cliente
+  const [fTipo, setFTipo] = useState('')
+  const [fCliente, setFCliente] = useState('')
+  const [pinned, setPinned] = useState(() => new Set()) // filas editadas que no desaparecen mientras se escribe
+
+  function changeFilter(setter, value) {
+    setter(value)
+    setPinned(new Set())
+  }
+
+  const patch = useCallback((id, field) => (val) => {
+    if (field === 'cliente' || field === 'formato') setPinned(p => new Set(p).add(id))
+    return updateRow(id, { [field]: val })
+  }, [updateRow])
+
+  const norm = v => (v || '').trim().toLowerCase()
+  const rowsOfMes = rows.filter(r => r.mes === activeMes)
+  const clienteOptions = [...new Map(
+    rowsOfMes.filter(r => norm(r.cliente)).map(r => [norm(r.cliente), r.cliente.trim()])
+  ).values()].sort((a, b) => a.localeCompare(b, 'es'))
+  const rowsForMes = rowsOfMes.filter(r =>
+    pinned.has(r.id) ||
+    ((!fTipo || r.formato === fTipo) && (!fCliente || norm(r.cliente) === norm(fCliente)))
+  )
+  const filtering = !!(fTipo || fCliente)
+
+  // Descarga en Excel: todo el mes, o solo lo que se ve cuando hay filtro activo
+  function handleDownload() {
+    const optLabel = (opts, v) => opts.find(o => o.value === v)?.label || ''
+    const fmtDay = v => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || ''))
+      return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+    }
+    const keys = ['cliente', 'formato', 'solicita', 'fecha_solicitud', 'codigo', 'copy_diseno', 'copy_red_social', 'aprobacion', 'fecha_entrega', 'disenado', 'link', 'publicacion', 'publicacion_check', 'fecha_publicacion', 'presupuesto', 'duracion', 'pauta', 'pauta_check']
+    const headers = keys.map(k => k === 'publicacion_check' ? `${labelFor('col_publicacion')} (check)` : k === 'pauta_check' ? `${labelFor('col_pauta')} (check)` : labelFor('col_' + k))
+    const data = rowsForMes.map(r => [
+      r.cliente, optLabel(FORMATO_OPTS, r.formato), optLabel(SOLICITA_OPTS, r.solicita), fmtDay(r.fecha_solicitud),
+      r.codigo, r.copy_diseno, r.copy_red_social, optLabel(APROBACION_OPTS, r.aprobacion), fmtDay(r.fecha_entrega),
+      optLabel(DISENADO_OPTS, r.disenado), r.link, optLabel(PUBLICACION_OPTS, r.publicacion), r.publicacion_check ? 'Sí' : '',
+      fmtDay(r.fecha_publicacion), optLabel(PRESUPUESTO_OPTS, r.presupuesto), r.duracion, optLabel(PAUTA_OPTS, r.pauta), r.verificado ? 'Sí' : '',
+    ])
+    const sufijo = filtering ? '-filtrado' : ''
+    downloadXlsx(`contenido-extra-${activeMes}${sufijo}.xlsx`, {
+      sheetName: mesKeyToLabel(activeMes),
+      headers,
+      rows: data,
+      widths: [22, 12, 11, 14, 14, 36, 36, 12, 14, 16, 30, 13, 12, 16, 16, 12, 12, 12],
+    })
+  }
 
   async function handleDelete(id) {
     if (confirmDeleteId !== id) { setConfirmDeleteId(id); return }
@@ -151,7 +199,7 @@ export default function ContenidoExtraPage() {
           <h1 className={styles.pageTitle}>Contenido Extra</h1>
           <p className={styles.pageSubtitle}>Arte y publicaciones extra fuera del cronograma regular</p>
         </div>
-        <button className="btn btn-primary" onClick={() => addRow(activeMes)}>+ Nueva fila</button>
+        <button className="btn btn-primary" onClick={() => addRow(activeMes, { formato: fTipo || null, cliente: fCliente || '' })}>+ Nueva fila</button>
         {isAdmin && (
           <button className={styles.editHeadersBtn} onClick={() => setShowEditHeaders(true)}>
             ✏️ Editar títulos
@@ -180,6 +228,27 @@ export default function ContenidoExtraPage() {
         <button className={styles.generarMesBtn} onClick={handleGenerarMes} disabled={generating}>
           + {generating ? 'Generando...' : 'Generar nuevo mes'}
         </button>
+      </div>
+
+      <div className={styles.filterBar}>
+        <span className={styles.filterLabel}>Filtro</span>
+        <select className={styles.filterSelect} value={fTipo} onChange={e => changeFilter(setFTipo, e.target.value)}>
+          <option value="">Tipo: todos</option>
+          {FORMATO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select className={styles.filterSelect} value={fCliente} onChange={e => changeFilter(setFCliente, e.target.value)}>
+          <option value="">Clientes: todos</option>
+          {clienteOptions.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <button className={styles.downloadBtn} onClick={handleDownload} disabled={rowsForMes.length === 0} title={filtering ? 'Descarga solo las filas que se ven con el filtro' : 'Descarga todas las filas del mes'}>
+          ⬇ {filtering ? `Descargar filtro (${rowsForMes.length})` : `Descargar todo (${rowsForMes.length})`}
+        </button>
+        {filtering && (
+          <>
+            <button className={styles.filterClear} onClick={() => { setFTipo(''); setFCliente(''); setPinned(new Set()) }}>Limpiar filtro</button>
+            <span className={styles.filterCount}>{rowsForMes.length} de {rowsOfMes.length} filas</span>
+          </>
+        )}
       </div>
 
       <div className={styles.tableWrap}>
@@ -217,7 +286,7 @@ export default function ContenidoExtraPage() {
           </thead>
           <tbody>
             {rowsForMes.length === 0 && (
-              <tr><td className={styles.emptyRow} colSpan={18}>No hay filas todavía en este mes. Usa "+ Nueva fila" para empezar.</td></tr>
+              <tr><td className={styles.emptyRow} colSpan={18}>{filtering ? 'Ninguna fila coincide con el filtro.' : 'No hay filas todavía en este mes. Usa "+ Nueva fila" para empezar.'}</td></tr>
             )}
             {rowsForMes.map(row => (
               <tr key={row.id} className={styles.row}>
