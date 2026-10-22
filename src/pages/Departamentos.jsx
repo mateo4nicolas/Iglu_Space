@@ -213,13 +213,14 @@ const CLIENT_PERIODS = [
 ]
 
 function ClientesBoard({ isAdmin }) {
-  const { clientsByPeriod, tasks, columnsForDept, updateTask, deleteTask, loading } = useMatriz()
+  const { clientsByPeriod, isClientActiveInMonth, tasks, columnsForDept, updateTask, deleteTask, loading } = useMatriz()
   const [period, setPeriod] = useState(CLIENT_PERIODS[0].value)
   const [mesTarea, setMesTarea] = useState(currentMesBase())
   const [selectedTask, setSelectedTask] = useState(null)
   const [collapsed, setCollapsed] = useState({})
 
-  const clientsInPeriod = clientsByPeriod(period)
+  const clientsForMonth = p => clientsByPeriod(p).filter(c => isClientActiveInMonth(c.id, mesTarea))
+  const clientsInPeriod = clientsForMonth(period)
 
   function tasksForClient(clientId) {
     return tasks.filter(t => t.cliente_id === clientId && t.approved !== false && t.mes_tarea === mesTarea)
@@ -273,7 +274,7 @@ function ClientesBoard({ isAdmin }) {
             onClick={() => setPeriod(p.value)}
           >
             {p.label}
-            <span className={styles.deptCount}>{clientsByPeriod(p.value).length}</span>
+            <span className={styles.deptCount}>{clientsForMonth(p.value).length}</span>
           </button>
         ))}
       </div>

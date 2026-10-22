@@ -128,7 +128,11 @@ export function useCronogramaContenidos() {
   // ── Conexión con Matriz: solo clientes activos ese mes (igual que en Matriz de Control) ──
   function isClientActiveInMonth(clientId, mes) {
     const entries = clientVisibility.filter(v => v.cliente_id === clientId && v.mes <= mes)
-    if (entries.length === 0) return true // sin registro -> activo por defecto
+    if (entries.length === 0) {
+      // sin registro -> activo solo desde el ciclo en que se añadió el cliente
+      const mesInicio = clients.find(c => c.id === clientId)?.mes_inicio
+      return !mesInicio || mes >= mesInicio
+    }
     return entries[entries.length - 1].active
   }
 

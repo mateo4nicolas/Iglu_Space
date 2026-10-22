@@ -81,7 +81,11 @@ export function useMatriz() {
   // ── Pausar/reactivar un cliente en la Matriz, por mes, sin borrar historial ──
   function isClientActiveInMonth(clientId, mes) {
     const entries = clientVisibility.filter(v => v.cliente_id === clientId && v.mes <= mes)
-    if (entries.length === 0) return true // sin registro -> activo por defecto
+    if (entries.length === 0) {
+      // sin registro -> activo solo desde el ciclo en que se añadió el cliente
+      const mesInicio = clients.find(c => c.id === clientId)?.mes_inicio
+      return !mesInicio || mes >= mesInicio
+    }
     const latest = entries[entries.length - 1] // vienen ordenadas por mes asc desde fetchAll
     return latest.active
   }

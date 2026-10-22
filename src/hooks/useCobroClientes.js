@@ -57,8 +57,12 @@ export function useCobroClientes() {
   }, [fetchAll])
 
   // Lista propia de Cobro Clientes: independiente de la Matriz y del resto de la plataforma
-  function allActiveClients() {
-    return clients
+  // Con mes: solo los clientes añadidos hasta ese ciclo (o que ya tengan datos en él)
+  function allActiveClients(mes) {
+    if (!mes) return clients
+    return clients.filter(c =>
+      !c.mes_inicio || mes >= c.mes_inicio || rows.some(r => r.cliente_id === c.id && r.mes === mes)
+    )
   }
 
   async function addClient(nombre) {

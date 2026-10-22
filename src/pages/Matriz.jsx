@@ -122,7 +122,7 @@ export default function MatrizPage() {
             onClick={() => setPeriod(p.value)}
           >
             {p.label}
-            <span className={styles.tabCount}>{clientsByPeriod(p.value).length}</span>
+            <span className={styles.tabCount}>{clientsByPeriod(p.value).filter(c => isClientActiveInMonth(c.id, mesAno)).length}</span>
           </button>
         ))}
       </div>
