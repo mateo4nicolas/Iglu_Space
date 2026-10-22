@@ -113,6 +113,24 @@ export function useTasks(departmentId) {
       })
       .select()
       .single()
+
+    // Si la tarea nace asignada, se agenda en el cronograma de esa persona
+    // (y de los editores con los que se comparte).
+    if (!error && data) {
+      const assignees = [...new Set([data.assigned_to, ...(data.shared_with || [])].filter(Boolean))]
+      if (assignees.length > 0) {
+        const { error: schedError } = await supabase.from('schedule_items').insert({
+          title: data.title,
+          task_id: data.id,
+          assigned_to: assignees,
+          date: data.fecha_cronograma || new Date().toISOString().slice(0, 10),
+          created_by: profile.id,
+          done_by: [],
+        })
+        if (schedError) console.error('No se pudo agendar en el cronograma:', schedError)
+      }
+    }
+
     if (!error) fetchTasks()
     return { data, error }
   }
