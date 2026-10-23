@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { personalTaskView } from '../utils/sharedTask'
+import { notifyTasksChanged, useTasksChanged } from '../utils/taskEvents'
 
 export function useTasks(departmentId) {
   const { profile, isAdmin, isSuperAdmin } = useAuth()
@@ -54,6 +55,8 @@ export function useTasks(departmentId) {
     if (isAdmin || isSuperAdmin || !profile) return rawTasks
     return rawTasks.map(t => personalTaskView(t, profile.id, allColumns)).filter(Boolean)
   }, [rawTasks, allColumns, isAdmin, isSuperAdmin, profile])
+
+  useTasksChanged(fetchTasks)
 
   useEffect(() => {
     if (!departmentId) return
@@ -131,7 +134,7 @@ export function useTasks(departmentId) {
       }
     }
 
-    if (!error) fetchTasks()
+    if (!error) { fetchTasks(); notifyTasksChanged() }
     return { data, error }
   }
 
@@ -140,7 +143,12 @@ export function useTasks(departmentId) {
       .from('tasks')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-    if (!error) fetchTasks()
+    if (error) {
+      console.error('updateTask error:', error)
+    } else {
+      await fetchTasks()
+      notifyTasksChanged()
+    }
     return { error }
   }
 
@@ -184,6 +192,7 @@ export function useTasks(departmentId) {
     const { error } = await supabase.from('tasks').delete().eq('id', id)
     if (error) { console.error('deleteTask error:', error); return { error } }
     fetchTasks()
+    notifyTasksChanged()
     return { error: null }
   }
 

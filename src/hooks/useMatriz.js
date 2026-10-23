@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { notifyTasksChanged, useTasksChanged } from '../utils/taskEvents'
 
 const TASK_SELECT = `
   id, title, description, links, status, priority, approved, is_finished,
@@ -67,6 +68,8 @@ export function useMatriz() {
     return () => supabase.removeChannel(channel)
   }, [fetchAll])
 
+  useTasksChanged(fetchAll)
+
   const activeMatrizColumns = matrizColumns.filter(c => c.is_active)
 
   // Tarea más reciente para un cliente + entregable + mes dado
@@ -113,7 +116,12 @@ export function useMatriz() {
       .from('tasks')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-    if (!error) fetchAll()
+    if (error) {
+      console.error('updateTask error:', error)
+    } else {
+      await fetchAll()
+      notifyTasksChanged()
+    }
     return { error }
   }
 
@@ -123,6 +131,7 @@ export function useMatriz() {
 
   async function deleteTask(id) {
     const { error } = await supabase.from('tasks').delete().eq('id', id)
+    if (!error) notifyTasksChanged()
     if (!error) fetchAll()
     return { error }
   }

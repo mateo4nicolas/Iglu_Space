@@ -312,13 +312,32 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
     setAllowedDepts(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
   }
 
+  const [savingEdit, setSavingEdit] = useState(false)
+
   async function saveEdit() {
-    await onUpdate(task.id, {
-      ...editData,
+    if (savingEdit) return
+    // Los selects usan '' como "sin valor"; en la BD debe ir null
+    // (un '' en cliente_id/periodo hace fallar el guardado).
+    const clean = { ...editData }
+    ;['cliente_id', 'periodo', 'columna_matriz', 'assigned_to', 'column_id'].forEach(k => {
+      if (clean[k] === '' || clean[k] === undefined) clean[k] = null
+    })
+    if (!clean.mes_tarea) delete clean.mes_tarea
+    clean.title = (clean.title || '').trim() || task.title
+    clean.description = (clean.description || '').trim() || null
+
+    setSavingEdit(true)
+    const result = await onUpdate(task.id, {
+      ...clean,
       allow_transfer: allowTransfer,
       transfer_to_dept_ids: allowTransfer ? allowedDepts : [],
       ...sharedPayload(),
     })
+    setSavingEdit(false)
+    if (result?.error) {
+      alert('No se pudieron guardar los cambios: ' + (result.error.message || 'error desconocido'))
+      return
+    }
     setEditing(false)
   }
 
@@ -823,8 +842,8 @@ export default function TaskModal({ task, columns, onClose, onUpdate, onApprove,
                         )}
                       </div>
                     )}
-                    <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: 13 }} onClick={saveEdit}>
-                      Guardar cambios
+                    <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: 13 }} onClick={saveEdit} disabled={savingEdit}>
+                      {savingEdit ? 'Guardando...' : 'Guardar cambios'}
                     </button>
                     <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', fontSize: 13 }} onClick={() => setEditing(false)}>
                       Cancelar

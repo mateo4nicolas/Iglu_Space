@@ -326,7 +326,7 @@ function ClientesBoard({ isAdmin }) {
           task={selectedTask}
           columns={columnsForDept(selectedTask.department_id)}
           onClose={() => setSelectedTask(null)}
-          onUpdate={async (id, data) => { await updateTask(id, data); setSelectedTask(null) }}
+          onUpdate={async (id, data) => { const r = await updateTask(id, data); if (!r?.error) setSelectedTask(null); return r }}
           onApprove={async (id, approved) => { await updateTask(id, { approved }); setSelectedTask(null) }}
           onDelete={async (id) => { await deleteTask(id); setSelectedTask(null) }}
         />
@@ -417,7 +417,7 @@ function DeptKanban({ departmentId, isAdmin }) {
           task={selectedTask}
           columns={columns}
           onClose={() => setSelectedTask(null)}
-          onUpdate={async (id, data) => { await updateTask(id, data); setSelectedTask(null) }}
+          onUpdate={async (id, data) => { const r = await updateTask(id, data); if (!r?.error) setSelectedTask(null); return r }}
           onApprove={async (id, approved) => {
             await updateTask(id, { approved, column_id: approved ? columns[0]?.id : null })
             setSelectedTask(null)

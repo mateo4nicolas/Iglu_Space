@@ -204,7 +204,7 @@ export default function MatrizPage() {
           task={selectedTask}
           columns={columnsForDept(selectedTask.department_id)}
           onClose={() => setSelectedTask(null)}
-          onUpdate={async (id, data) => { await updateTask(id, data); setSelectedTask(null) }}
+          onUpdate={async (id, data) => { const r = await updateTask(id, data); if (!r?.error) setSelectedTask(null); return r }}
           onApprove={async (id, approved) => { await approveTask(id, approved); setSelectedTask(null) }}
           onDelete={async (id) => { await deleteTask(id) }}
         />

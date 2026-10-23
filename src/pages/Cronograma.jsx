@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase'
 import TaskModal from '../components/tasks/TaskModal'
 import { cycleLabel } from '../utils/cycleLabel'
 import styles from './Cronograma.module.css'
+import { notifyTasksChanged } from '../utils/taskEvents'
 import MetaProgressBar from '../components/ui/MetaProgressBar'
 
 export default function CronogramaPage() {
@@ -62,8 +63,13 @@ export default function CronogramaPage() {
   }
 
   async function updateOpenTask(id, updates) {
-    await supabase.from('tasks').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
-    refetch()
+    const { error } = await supabase.from('tasks').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (!error) {
+      refetch()
+      notifyTasksChanged()
+      setOpenTask(null)
+    }
+    return { error }
   }
   async function approveOpenTask(id, approved) {
     await updateOpenTask(id, { approved })

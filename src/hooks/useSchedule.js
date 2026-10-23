@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format } from 'date-fns'
+import { useTasksChanged } from '../utils/taskEvents'
 
 export function useSchedule(selectedDate) {
   const { profile, isAdmin } = useAuth()
@@ -56,6 +57,8 @@ export function useSchedule(selectedDate) {
     }
     setLoading(false)
   }, [profile, isAdmin, dateStr])
+
+  useTasksChanged(fetchItems)
 
   useEffect(() => {
     if (!profile) return
