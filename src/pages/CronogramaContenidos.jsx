@@ -5,6 +5,7 @@ import {
 } from '../hooks/useCronogramaContenidos'
 import { buildResumen } from '../utils/informeResumen'
 import { cycleLabel, currentMesBase, shiftMesBase } from '../utils/cycleLabel'
+import NewClientBadge from '../components/ui/NewClientBadge'
 import styles from './CronogramaContenidos.module.css'
 
 const PERIODS = [
@@ -161,6 +162,7 @@ export default function CronogramaContenidosPage() {
                 onClick={() => { setSelectedClientId(c.id); setShowResumen(false) }}
               >
                 {c.brand_name}
+                <NewClientBadge client={c} mes={mesAno} />
               </button>
             ))}
           </div>
@@ -287,7 +289,8 @@ function ClientPanel({
       let tablePtPerPx = null
       let headerCanvas = null
 
-      function placeBlock(canvas, ptPerPx, { repeatHeader } = {}) {
+      // links: [{ url, x, y, w, h }] en px CSS relativos al bloque capturado
+      function placeBlock(canvas, ptPerPx, { repeatHeader, links } = {}) {
         const hPt = canvas.height * ptPerPx
         if (cursorY > 0 && cursorY + hPt > pageH) {
           doc.addPage([A4.w, A4.h], 'landscape')
@@ -295,7 +298,20 @@ function ClientPanel({
           if (repeatHeader && headerCanvas) placeBlock(headerCanvas, tablePtPerPx)
         }
         doc.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, cursorY, pageW, hPt)
+        // html2canvas captura a scale 2: 1px CSS = 2px del canvas
+        const k = 2 * ptPerPx
+        ;(links || []).forEach(l => {
+          try { doc.link(l.x * k, cursorY + l.y * k, l.w * k, l.h * k, { url: l.url }) } catch { /* noop */ }
+        })
         cursorY += hPt
+      }
+
+      function collectLinks(el) {
+        const box = el.getBoundingClientRect()
+        return Array.from(el.querySelectorAll('a[data-pdf-link]')).map(a => {
+          const r = a.getBoundingClientRect()
+          return { url: a.getAttribute('data-pdf-link'), x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height }
+        }).filter(l => l.w > 0 && l.h > 0)
       }
 
       if (activityBlockRef.current) {
@@ -315,12 +331,14 @@ function ClientPanel({
         const sectionEls = Array.from(tableEl.querySelectorAll('tbody[data-pdf-section]'))
         for (const sectionEl of sectionEls) {
           // Oculta temporalmente la fila de "Añadir fila" (no debe salir en el informe)
-          const skipRows = Array.from(sectionEl.querySelectorAll('[data-pdf-skip]'))
+          // ...y los controles de edición de enlaces (input "pegar enlace" y ✕)
+          const skipRows = Array.from(sectionEl.querySelectorAll('[data-pdf-skip], [data-pdf-hide]'))
           const prevDisplay = skipRows.map(r => r.style.display)
           skipRows.forEach(r => { r.style.display = 'none' })
           const sectionCanvas = await capture(sectionEl, fullW)
+          const sectionLinks = collectLinks(sectionEl)
           skipRows.forEach((r, i) => { r.style.display = prevDisplay[i] })
-          placeBlock(sectionCanvas, tablePtPerPx || pageW / sectionCanvas.width, { repeatHeader: true })
+          placeBlock(sectionCanvas, tablePtPerPx || pageW / sectionCanvas.width, { repeatHeader: true, links: sectionLinks })
         }
       }
 
@@ -684,6 +702,31 @@ function SectionRows({ section, clientId, mes, config, hasVector, networks, rows
   )
 }
 
+// Etiqueta corta según la plataforma del enlace (el URL completo queda en el
+// tooltip y como hipervínculo, también en el PDF descargado).
+const LINK_PLATFORMS = [
+  [/instagram\.com/i, 'Instagram'],
+  [/tiktok\.com/i, 'TikTok'],
+  [/(facebook\.com|fb\.watch|fb\.com)/i, 'Facebook'],
+  [/(youtube\.com|youtu\.be)/i, 'YouTube'],
+  [/(drive|docs)\.google\.com/i, 'Drive'],
+  [/canva\.(com|link)/i, 'Canva'],
+  [/(linkedin\.com|lnkd\.in)/i, 'LinkedIn'],
+  [/(twitter\.com|x\.com)/i, 'X'],
+  [/(wa\.me|whatsapp\.com)/i, 'WhatsApp'],
+  [/(dropbox\.com)/i, 'Dropbox'],
+  [/(figma\.com)/i, 'Figma'],
+]
+function linkLabels(urls) {
+  const base = (urls || []).map(u => (LINK_PLATFORMS.find(([re]) => re.test(u)) || [null, 'Enlace'])[1])
+  const totals = base.reduce((acc, l) => ({ ...acc, [l]: (acc[l] || 0) + 1 }), {})
+  const seen = {}
+  return base.map(l => {
+    seen[l] = (seen[l] || 0) + 1
+    return totals[l] > 1 ? `${l} ${seen[l]}` : l
+  })
+}
+
 // Lista de enlaces reales (clicables), con opción de añadir varios
 function LinksEditor({ value, onCommit }) {
   const [draft, setDraft] = useState('')
@@ -703,15 +746,15 @@ function LinksEditor({ value, onCommit }) {
     <div>
       {value && value.length > 0 && (
         <div className={styles.linksList}>
-          {value.map((url, i) => (
+          {(() => { const labels = linkLabels(value); return value.map((url, i) => (
             <div key={i} className={styles.linkChip}>
-              <a href={url} target="_blank" rel="noopener noreferrer" title={url}>{url.replace(/^https?:\/\//, '')}</a>
-              <button className={styles.linkChipRemove} onClick={() => removeLink(i)} title="Quitar enlace">✕</button>
+              <a href={url} target="_blank" rel="noopener noreferrer" title={url} data-pdf-link={url} className={styles.linkTag}>🔗 {labels[i]}</a>
+              <button className={styles.linkChipRemove} onClick={() => removeLink(i)} title="Quitar enlace" data-pdf-hide="true">✕</button>
             </div>
-          ))}
+          )) })()}
         </div>
       )}
-      <div className={styles.linkAddRow}>
+      <div className={styles.linkAddRow} data-pdf-hide="true">
         <input
           className={styles.linkAddInput}
           placeholder="pegar enlace"

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useClients, BILLING_PERIODS } from '../hooks/useClients'
 import { useAuth } from '../context/AuthContext'
 import { RESUMEN_LINKS, FICHA_LINK_LABELS, FICHA_TEXT_FIELDS, FICHA_DATE_FIELD, FICHA_NUM_FIELDS, FICHA_INVERSION_FIELDS, fmtNumber } from '../utils/clientFicha'
+import NewClientBadge from '../components/ui/NewClientBadge'
 import styles from './Clientes.module.css'
 
 export default function ClientesPage() {
@@ -169,7 +170,7 @@ function ClientCard({ client, archived, canEdit, onEdit, onArchive, onRestore, o
     <div className={`${styles.clientCard} ${archived ? styles.clientCardArchived : ''}`}>
       <div className={styles.clientAvatar}>{client.brand_name[0]?.toUpperCase()}</div>
       <div className={styles.clientInfo}>
-        <span className={styles.clientName}>{client.brand_name}</span>
+        <span className={styles.clientName}>{client.brand_name}{!archived && <NewClientBadge client={client} />}</span>
         <span className={`badge ${archived ? 'badge-danger' : 'badge-success'}`} style={{ fontSize: 10 }}>
           {archived ? 'Archivado' : 'Activo'}
         </span>

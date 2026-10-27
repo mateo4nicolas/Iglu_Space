@@ -3,6 +3,7 @@ import { useMatriz } from '../hooks/useMatriz'
 import { useAuth } from '../context/AuthContext'
 import TaskModal from '../components/tasks/TaskModal'
 import { cycleLabel, currentMesBase, shiftMesBase } from '../utils/cycleLabel'
+import NewClientBadge from '../components/ui/NewClientBadge'
 import styles from './Matriz.module.css'
 
 const PERIODS = [
@@ -153,6 +154,7 @@ export default function MatrizPage() {
                   <td className={styles.rowHeader}>
                     <span className={styles.clientDot}>{client.brand_name[0]?.toUpperCase()}</span>
                     {client.brand_name}
+                    <NewClientBadge client={client} mes={mesAno} />
                   </td>
                   <td className={styles.cell}>
                     <div className={styles.checkboxWrap}>

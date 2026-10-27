@@ -9,6 +9,7 @@ import CreateTaskModal from '../components/tasks/CreateTaskModal'
 import ColumnSettings from '../components/tasks/ColumnSettings'
 import { cycleLabel, currentMesBase } from '../utils/cycleLabel'
 import { sharedSentCount } from '../utils/sharedTask'
+import NewClientBadge from '../components/ui/NewClientBadge'
 import styles from './Departamentos.module.css'
 
 export default function DepartamentosPage() {
@@ -298,6 +299,7 @@ function ClientesBoard({ isAdmin }) {
                   </button>
                   <div className={styles.colDot} style={{ background: 'var(--accent)' }} />
                   <span className={styles.colTitle}>{client.brand_name}</span>
+                  <NewClientBadge client={client} mes={mesTarea} />
                   <span className={styles.colCount}>{clientTasks.length}</span>
                 </div>
                 {!isCollapsed && (
