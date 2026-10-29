@@ -47,10 +47,11 @@ export function useClients() {
     return () => supabase.removeChannel(channel)
   }, [fetchClients])
 
-  async function createClient({ brand_name, billing_period }) {
+  async function createClient({ brand_name, billing_period, mes_inicio }) {
     const { data, error } = await supabase.from('clients').insert({
       brand_name: brand_name.trim(),
       billing_period,
+      ...(mes_inicio ? { mes_inicio } : {}),
       is_active: true,
       created_by: profile?.id || null,
     }).select('id').single()

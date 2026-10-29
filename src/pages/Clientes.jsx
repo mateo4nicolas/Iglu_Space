@@ -196,6 +196,8 @@ function ClientCard({ client, archived, canEdit, onEdit, onArchive, onRestore, o
 function ClientFormModal({ title, client, ficha, onClose, onSave }) {
   const [brandName, setBrandName] = useState(client?.brand_name || '')
   const [billingPeriod, setBillingPeriod] = useState(client?.billing_period || BILLING_PERIODS[0].value)
+  // Primer periodo del cliente: desde aquí aparece en Matriz/Informe y lleva la etiqueta NUEVO
+  const [mesInicio, setMesInicio] = useState(client?.mes_inicio || '')
   const [fichaData, setFichaData] = useState(() => {
     const init = {}
     FICHA_TEXT_FIELDS.forEach(({ key }) => { init[key] = ficha?.[key] ?? '' })
@@ -214,7 +216,12 @@ function ClientFormModal({ title, client, ficha, onClose, onSave }) {
     if (!brandName.trim() || !billingPeriod) return
     setLoading(true)
     setErrorMsg('')
-    const { error } = await onSave({ brand_name: brandName.trim(), billing_period: billingPeriod, ficha: fichaData })
+    const { error } = await onSave({
+      brand_name: brandName.trim(),
+      billing_period: billingPeriod,
+      ...(mesInicio ? { mes_inicio: mesInicio } : {}),
+      ficha: fichaData,
+    })
     setLoading(false)
     if (error) setErrorMsg(error.message || 'No se pudo guardar el cliente')
   }
@@ -251,6 +258,20 @@ function ClientFormModal({ title, client, ficha, onClose, onSave }) {
               </button>
             ))}
           </div>
+
+          <label className={styles.label}>Primer periodo (mes de inicio)</label>
+          <input
+            type="month"
+            className={styles.input}
+            value={mesInicio}
+            onChange={e => setMesInicio(e.target.value)}
+          />
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            {billingPeriod === '15_14'
+              ? 'Ciclo 15 al 14: elige el mes en que empieza el ciclo (ej. noviembre = 15 Nov - 14 Dic).'
+              : 'Ciclo 1 al 31: elige el mes en que empieza.'}
+            {' '}Vacío = el periodo en que se crea. En ese primer periodo el cliente lleva la etiqueta NUEVO.
+          </p>
 
           <p className={styles.sectionTitle}>Ficha del cliente</p>
           <div className={styles.fichaGrid}>
