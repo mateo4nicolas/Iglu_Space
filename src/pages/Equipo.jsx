@@ -11,6 +11,7 @@ export default function EquipoPage() {
   const [profileDepts, setProfileDepts] = useState({}) // { userId: [deptId, ...] }
   const [cronogramaAccess, setCronogramaAccess] = useState([]) // [userId, ...] con acceso concedido a Cronograma de Contenidos
   const [cobroAccess, setCobroAccess] = useState([]) // [userId, ...] con acceso concedido a Cobro Clientes
+  const [pautaAccess, setPautaAccess] = useState([]) // [userId, ...] con acceso a Seguimiento Pauta
   const [estructuraAccess, setEstructuraAccess] = useState([]) // [userId, ...] que pueden modificar la estructura del Informe de Contenidos
   const [loading, setLoading] = useState(true)
   const [editingDepts, setEditingDepts] = useState(null)  // userId being edited for depts
@@ -26,13 +27,14 @@ export default function EquipoPage() {
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
-    const [{ data: p }, { data: d }, { data: pd }, { data: pa }, { data: fa }, { data: ea }] = await Promise.all([
+    const [{ data: p }, { data: d }, { data: pd }, { data: pa }, { data: fa }, { data: ea }, { data: spa }] = await Promise.all([
       supabase.from('profiles').select('*, departments(id, name, color)').order('full_name'),
       supabase.from('departments').select('*').order('name'),
       supabase.from('profile_departments').select('user_id, department_id, departments(id, name, color)'),
       supabase.from('page_access').select('user_id').eq('page', 'cronograma_contenidos'),
       supabase.from('page_access').select('user_id').eq('page', 'cobro_clientes'),
       supabase.from('page_access').select('user_id').eq('page', 'cronograma_estructura'),
+      supabase.from('page_access').select('user_id').eq('page', 'seguimiento_pauta'),
     ])
     setProfiles(p || [])
     setDepartments(d || [])
@@ -46,6 +48,7 @@ export default function EquipoPage() {
     setCronogramaAccess((pa || []).map(r => r.user_id))
     setCobroAccess((fa || []).map(r => r.user_id))
     setEstructuraAccess((ea || []).map(r => r.user_id))
+    setPautaAccess((spa || []).map(r => r.user_id))
     setLoading(false)
   }
 
@@ -65,6 +68,16 @@ export default function EquipoPage() {
       await supabase.from('page_access').delete().eq('user_id', userId).eq('page', 'cronograma_estructura')
     } else {
       await supabase.from('page_access').insert({ user_id: userId, page: 'cronograma_estructura', granted_by: myProfile?.id || null })
+    }
+    fetchAll()
+  }
+
+  async function togglePautaAccess(userId) {
+    const has = pautaAccess.includes(userId)
+    if (has) {
+      await supabase.from('page_access').delete().eq('user_id', userId).eq('page', 'seguimiento_pauta')
+    } else {
+      await supabase.from('page_access').insert({ user_id: userId, page: 'seguimiento_pauta', granted_by: myProfile?.id || null })
     }
     fetchAll()
   }
@@ -269,6 +282,17 @@ export default function EquipoPage() {
                     title="Dar o quitar permiso para modificar la estructura de la tabla en el Informe de Contenidos"
                   >
                     {estructuraAccess.includes(p.id) ? '✓ Estructura Informe' : '+ Estructura Informe'}
+                  </button>
+                )}
+
+                {isAdmin && !p.is_super_admin && p.role !== 'admin' && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, padding: '5px 10px', color: pautaAccess.includes(p.id) ? 'var(--accent)' : undefined }}
+                    onClick={() => togglePautaAccess(p.id)}
+                    title="Dar o quitar acceso a la pestaña Seguimiento Pauta"
+                  >
+                    {pautaAccess.includes(p.id) ? '✓ Seguimiento Pauta' : '+ Seguimiento Pauta'}
                   </button>
                 )}
 
