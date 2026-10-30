@@ -39,7 +39,7 @@ export default function Sidebar() {
   const base = isAdmin ? adminNavBase : userNavBase
   const extras = []
   if (isAdmin || hasPageAccess('cronograma_contenidos')) extras.push(cronogramaContenidosItem)
-  if (isAdmin || hasPageAccess('seguimiento_pauta')) extras.push(seguimientoPautaItem)
+  extras.push(seguimientoPautaItem) // todos la ven; solo el dep. de Pauta edita
   if (hasFinancialAccess) extras.push(cobroClientesItem)
   const insertAt = base.findIndex(item => item.to === '/contenido-extra') + 1
   const navItems = extras.length

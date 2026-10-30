@@ -35,7 +35,7 @@ export default function App() {
             <Route path="/matriz"        element={<MatrizPage />} />
             <Route path="/contenido-extra" element={<ContenidoExtraPage />} />
             <Route path="/cronograma-contenidos" element={<PageAccessRoute page="cronograma_contenidos"><CronogramaContenidosPage /></PageAccessRoute>} />
-            <Route path="/seguimiento-pauta" element={<PageAccessRoute page="seguimiento_pauta"><SeguimientoPautaPage /></PageAccessRoute>} />
+            <Route path="/seguimiento-pauta" element={<SeguimientoPautaPage />} />
             <Route path="/cobro-clientes" element={<FinancialAccessRoute><CobroClientesPage /></FinancialAccessRoute>} />
             <Route path="/equipo"        element={<AdminRoute><EquipoPage /></AdminRoute>} />
             <Route path="/admin"         element={<AdminRoute><AdminPage /></AdminRoute>} />

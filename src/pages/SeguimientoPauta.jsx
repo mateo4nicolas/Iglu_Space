@@ -26,6 +26,7 @@ function normalizeUrl(v) {
 
 export default function SeguimientoPautaPage() {
   const {
+    canEdit,
     loading, clientsFor, rowFor, saveRow,
     informeCols, addInformeCol, renameInformeCol, deleteInformeCol,
   } = useSeguimientoPauta()
@@ -63,6 +64,7 @@ export default function SeguimientoPautaPage() {
         <div>
           <h1 className={styles.pageTitle}>Seguimiento Pauta</h1>
           <p className={styles.pageSubtitle}>Panel de gestión de clientes: ventas semanales, creativos ganadores, vectores e informes</p>
+          {!canEdit && <span className={styles.readOnlyBadge}>👁 Solo lectura · edita el departamento de Pauta</span>}
         </div>
         <div className={styles.monthNav}>
           <button className={styles.monthNavBtn} onClick={() => setMes(m => shiftMesBase(m, -1))} aria-label="Mes anterior">‹</button>
@@ -95,7 +97,7 @@ export default function SeguimientoPautaPage() {
                 <th className={`${styles.groupCell} ${styles.gVentas}`} colSpan={WEEKS.length + 1}>Registro de ventas semanales</th>
                 <th className={`${styles.groupCell} ${styles.gCreativos}`} colSpan={CREATIVOS.length}>Creativos ganadores</th>
                 <th className={`${styles.groupCell} ${styles.gVectores}`} colSpan={2}>Vectores y métricas</th>
-                <th className={`${styles.groupCell} ${styles.gInformes}`} colSpan={informeCols.length + 1}>Informes y seguimiento operativo</th>
+                <th className={`${styles.groupCell} ${styles.gInformes}`} colSpan={informeCols.length + (canEdit ? 1 : 0)}>Informes y seguimiento operativo</th>
               </tr>
               <tr>
                 {WEEKS.map(w => <th key={w} className={styles.colWeek}>Semana {w}</th>)}
@@ -107,13 +109,14 @@ export default function SeguimientoPautaPage() {
                   <InformeHeader
                     key={col.id}
                     col={col}
+                    canEdit={canEdit}
                     onRename={t => renameInformeCol(col.id, t)}
                     onDelete={() => {
                       if (window.confirm(`¿Quitar la columna "${col.titulo}"? Se ocultarán sus links en todos los clientes.`)) deleteInformeCol(col.id)
                     }}
                   />
                 ))}
-                <th className={styles.colAdd}>
+                {canEdit && <th className={styles.colAdd}>
                   {addingCol ? (
                     <form onSubmit={submitNewCol} className={styles.addColForm}>
                       <input
@@ -128,7 +131,7 @@ export default function SeguimientoPautaPage() {
                   ) : (
                     <button className={styles.addColBtn} onClick={() => setAddingCol(true)} title="Añadir otra columna de informe">+ Informe</button>
                   )}
-                </th>
+                </th>}
               </tr>
             </thead>
             <tbody>
@@ -147,6 +150,7 @@ export default function SeguimientoPautaPage() {
                     {WEEKS.map(w => (
                       <td key={w} className={styles.colWeek}>
                         <MoneyNoteCell
+                          readOnly={!canEdit}
                           valor={semanas[w]?.valor}
                           nota={semanas[w]?.nota}
                           onCommit={val => save({ semanas: { ...semanas, [w]: { ...(semanas[w] || {}), ...val } } })}
@@ -157,6 +161,7 @@ export default function SeguimientoPautaPage() {
                     {CREATIVOS.map(i => (
                       <td key={i} className={styles.colCreativo}>
                         <LinkCell
+                          readOnly={!canEdit}
                           withText
                           url={creativos[i]?.url}
                           texto={creativos[i]?.texto}
@@ -171,14 +176,15 @@ export default function SeguimientoPautaPage() {
                       </td>
                     ))}
                     <td className={styles.colAvatar}>
-                      <TextCell value={row?.avatar_angulo || ''} placeholder="Avatar y ángulo..." onCommit={v => save({ avatar_angulo: v || null })} />
+                      <TextCell readOnly={!canEdit} value={row?.avatar_angulo || ''} placeholder="Avatar y ángulo..." onCommit={v => save({ avatar_angulo: v || null })} />
                     </td>
                     <td className={styles.colCosto}>
-                      <MoneyInput value={row?.costo_resultado} onCommit={v => save({ costo_resultado: v })} />
+                      <MoneyInput readOnly={!canEdit} value={row?.costo_resultado} onCommit={v => save({ costo_resultado: v })} />
                     </td>
                     {informeCols.map(col => (
                       <td key={col.id} className={styles.colInforme}>
                         <LinkCell
+                          readOnly={!canEdit}
                           url={informes[col.id]}
                           emptyLabel="+ Link"
                           linkLabel="Ver informe"
@@ -186,7 +192,7 @@ export default function SeguimientoPautaPage() {
                         />
                       </td>
                     ))}
-                    <td className={styles.colAdd} />
+                    {canEdit && <td className={styles.colAdd} />}
                   </tr>
                 )
               })}
@@ -196,7 +202,7 @@ export default function SeguimientoPautaPage() {
                 <td className={`${styles.stickyCol} ${styles.footLabel}`}>Total</td>
                 {WEEKS.map(w => <td key={w} className={styles.footCell}>{fmtMoney(weekTotal(w))}</td>)}
                 <td className={`${styles.footCell} ${styles.footGrand}`}>{fmtMoney(WEEKS.reduce((a, w) => a + weekTotal(w), 0))}</td>
-                <td colSpan={CREATIVOS.length + 2 + informeCols.length + 1} />
+                <td colSpan={CREATIVOS.length + 2 + informeCols.length + (canEdit ? 1 : 0)} />
               </tr>
             </tfoot>
           </table>
@@ -207,7 +213,7 @@ export default function SeguimientoPautaPage() {
 }
 
 // ── Encabezado editable de una columna de informe ───────────────────────────
-function InformeHeader({ col, onRename, onDelete }) {
+function InformeHeader({ col, canEdit, onRename, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(col.titulo)
   useEffect(() => { setTitle(col.titulo) }, [col.titulo])
@@ -231,8 +237,12 @@ function InformeHeader({ col, onRename, onDelete }) {
         />
       ) : (
         <div className={styles.informeHead}>
-          <span className={styles.informeTitle} onClick={() => setEditing(true)} title="Clic para cambiar el título">{col.titulo}</span>
-          <button className={styles.headDel} onClick={onDelete} title="Quitar columna">✕</button>
+          {canEdit ? (
+            <>
+              <span className={styles.informeTitle} onClick={() => setEditing(true)} title="Clic para cambiar el título">{col.titulo}</span>
+              <button className={styles.headDel} onClick={onDelete} title="Quitar columna">✕</button>
+            </>
+          ) : <span>{col.titulo}</span>}
         </div>
       )}
     </th>
@@ -240,13 +250,16 @@ function InformeHeader({ col, onRename, onDelete }) {
 }
 
 // ── Celdas ──────────────────────────────────────────────────────────────────
-function MoneyInput({ value, onCommit }) {
+function MoneyInput({ value, onCommit, readOnly }) {
   const [v, setV] = useState(value ?? '')
   useEffect(() => { setV(value ?? '') }, [value])
   function commit() {
     const next = v === '' || v === null ? null : Number(v)
     const prev = value === '' || value === undefined ? null : value
     if (next !== prev && !(Number.isNaN(next))) onCommit(next)
+  }
+  if (readOnly) {
+    return <span className={styles.readValue}>{value === null || value === undefined || value === '' ? '—' : fmtMoney(value)}</span>
   }
   return (
     <div className={styles.moneyWrap}>
@@ -266,9 +279,17 @@ function MoneyInput({ value, onCommit }) {
   )
 }
 
-function MoneyNoteCell({ valor, nota, onCommit }) {
+function MoneyNoteCell({ valor, nota, onCommit, readOnly }) {
   const [n, setN] = useState(nota || '')
   useEffect(() => { setN(nota || '') }, [nota])
+  if (readOnly) {
+    return (
+      <div className={styles.weekCell}>
+        <MoneyInput readOnly value={valor} />
+        {nota && <p className={styles.readNote}>{nota}</p>}
+      </div>
+    )
+  }
   return (
     <div className={styles.weekCell}>
       <MoneyInput value={valor} onCommit={v => onCommit({ valor: v })} />
@@ -284,9 +305,10 @@ function MoneyNoteCell({ valor, nota, onCommit }) {
   )
 }
 
-function TextCell({ value, placeholder, onCommit }) {
+function TextCell({ value, placeholder, onCommit, readOnly }) {
   const [v, setV] = useState(value)
   useEffect(() => { setV(value) }, [value])
+  if (readOnly) return <p className={styles.readText}>{value || '—'}</p>
   return (
     <textarea
       className={styles.textInput}
@@ -299,7 +321,7 @@ function TextCell({ value, placeholder, onCommit }) {
   )
 }
 
-function LinkCell({ url, texto, withText, emptyLabel, linkLabel = 'Ver enlace', onCommit }) {
+function LinkCell({ url, texto, withText, emptyLabel, linkLabel = 'Ver enlace', onCommit, readOnly }) {
   const [editing, setEditing] = useState(false)
   const [u, setU] = useState(url || '')
   const [t, setT] = useState(texto || '')
@@ -339,6 +361,7 @@ function LinkCell({ url, texto, withText, emptyLabel, linkLabel = 'Ver enlace', 
   }
 
   if (!url && !texto) {
+    if (readOnly) return <span className={styles.readValue}>—</span>
     return <button className={styles.linkEmpty} onClick={open}>{emptyLabel}</button>
   }
 
@@ -351,7 +374,7 @@ function LinkCell({ url, texto, withText, emptyLabel, linkLabel = 'Ver enlace', 
       ) : (
         <span className={styles.linkChipMuted}>{texto}</span>
       )}
-      <button className={styles.linkEditBtn} onClick={open} title="Editar">✎</button>
+      {!readOnly && <button className={styles.linkEditBtn} onClick={open} title="Editar">✎</button>}
     </div>
   )
 }

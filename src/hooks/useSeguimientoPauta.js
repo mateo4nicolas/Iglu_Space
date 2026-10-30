@@ -20,6 +20,16 @@ export function useSeguimientoPauta() {
   const [rows, setRows] = useState([])
   const [informeCols, setInformeCols] = useState([])
   const [loading, setLoading] = useState(true)
+  const [canEdit, setCanEdit] = useState(false)
+
+  // Solo edita quien pertenece al departamento de Pauta (la BD lo valida igual)
+  useEffect(() => {
+    if (!profile?.id) return
+    supabase.rpc('can_edit_seguimiento_pauta').then(({ data, error }) => {
+      if (error) console.error('can_edit_seguimiento_pauta:', error)
+      setCanEdit(!!data)
+    })
+  }, [profile?.id])
 
   const fetchAll = useCallback(async () => {
     const [{ data: c }, { data: v }, { data: r }, { data: ic }] = await Promise.all([
@@ -71,6 +81,7 @@ export function useSeguimientoPauta() {
   }
 
   async function saveRow(clienteId, mes, patch) {
+    if (!canEdit) return { error: null }
     const current = rowFor(clienteId, mes) || {}
     const merged = {
       cliente_id: clienteId,
@@ -126,6 +137,7 @@ export function useSeguimientoPauta() {
   }
 
   return {
+    canEdit,
     loading, clientsFor, rowFor, saveRow,
     informeCols, addInformeCol, renameInformeCol, deleteInformeCol,
   }
