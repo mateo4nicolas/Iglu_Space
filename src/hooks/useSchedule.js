@@ -38,7 +38,10 @@ export function useSchedule(selectedDate) {
     }
 
     if (data && data.length > 0) {
-      const allUids = [...new Set(data.flatMap(i => i.assigned_to || []))]
+      const allUids = [...new Set([
+        ...data.flatMap(i => i.assigned_to || []),
+        ...data.flatMap(i => (i.observations || []).map(o => o.user_id).filter(Boolean)),
+      ])]
       const { data: profileData } = await supabase
         .from('profiles')
         .select('id, full_name, display_name, username')
@@ -49,6 +52,7 @@ export function useSchedule(selectedDate) {
           ...item,
           done_by: item.done_by || [],
           assignees: (item.assigned_to || []).map(uid => profileMap[uid]).filter(Boolean),
+          observations_view: (item.observations || []).map(o => ({ ...o, author: profileMap[o.user_id] || null })),
           is_overdue: item.date < dateStr,
         }))
       )
@@ -187,6 +191,33 @@ export function useSchedule(selectedDate) {
     return { error: itemError || taskError || null }
   }
 
+  // ── Observaciones múltiples (cada quien añade las suyas) ──
+  async function addObservation(id, text) {
+    const item = items.find(i => i.id === id)
+    const { error } = await supabase.rpc('add_schedule_observation', { p_item_id: id, p_text: text })
+    if (!error && item?.task_id && text?.trim()) {
+      await supabase.from('task_messages').insert({
+        task_id: item.task_id,
+        user_id: profile.id,
+        content: `📋 Observación del cronograma: ${text.trim()}`,
+      })
+    }
+    fetchItems()
+    return { error }
+  }
+
+  async function editObservation(id, obsId, text) {
+    const { error } = await supabase.rpc('update_schedule_observation', { p_item_id: id, p_obs_id: obsId, p_text: text })
+    fetchItems()
+    return { error }
+  }
+
+  async function deleteObservation(id, obsId) {
+    const { error } = await supabase.rpc('delete_schedule_observation', { p_item_id: id, p_obs_id: obsId })
+    fetchItems()
+    return { error }
+  }
+
   async function updateObservation(id, user_observation) {
     const item = items.find(i => i.id === id)
     await supabase.from('schedule_items').update({ user_observation }).eq('id', id)
@@ -258,6 +289,9 @@ export function useSchedule(selectedDate) {
     toggleDone,
     adminSetDone,
     updateObservation,
+    addObservation,
+    editObservation,
+    deleteObservation,
     deleteItem,
     linkTask,
     completeNativeItem,
