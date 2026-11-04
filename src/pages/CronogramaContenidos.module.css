@@ -162,3 +162,6 @@
   .page { padding: 14px; }
   .idGrid, .activityGrid { grid-template-columns: 110px 1fr; }
 }
+
+.planInput { width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); font-size: 13px; padding: 8px 10px; font-family: inherit; }
+.planInput:focus { outline: none; border-color: var(--accent); }

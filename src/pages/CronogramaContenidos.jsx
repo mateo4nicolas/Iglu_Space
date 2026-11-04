@@ -3,7 +3,10 @@ import { useAuth } from '../context/AuthContext'
 import {
   useCronogramaContenidos, STAGE_DEFS, WEEK_DEFS, NETWORK_DEFS, ACTIVITY_FIELDS,
 } from '../hooks/useCronogramaContenidos'
-import { buildResumen } from '../utils/informeResumen'
+import { buildInformeEjecutivo, notaAutomatica, inferTipo } from '../utils/informeEjecutivo'
+import { generarInformePdf } from '../utils/informePdf'
+import { linkLabels } from '../utils/linkLabels'
+import { InformeScreen, InformeContent, PrintTable, pdfPageClass, pdfPageContentClass, pdfCompactClass } from '../components/informe/InformePrint'
 import { cycleLabel, currentMesBase, shiftMesBase } from '../utils/cycleLabel'
 import NewClientBadge from '../components/ui/NewClientBadge'
 import styles from './CronogramaContenidos.module.css'
@@ -214,7 +217,8 @@ function ClientPanel({
   aprobacionFilaFecha, saveConfig, onOpenConfig, showConfig, onCloseConfig, showResumen, onToggleResumen,
 }) {
   const panelRef = useRef(null)
-  const resumenRef = useRef(null)
+  const informeContentRef = useRef(null)
+  const printTableRef = useRef(null)
   const tableScrollRef = useRef(null)
   const activityBlockRef = useRef(null)
   const noteBoxRef = useRef(null)
@@ -227,133 +231,63 @@ function ClientPanel({
     })
   }, [client.id, mes, config.mode, config.vectors, sections.map(s => s.id).join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const resumenData = buildResumen({
+  // ── Informe ejecutivo + tabla para el PDF ──
+  const informeRows = buildInformeRows(client.id, mes, sections, networks, allRowsFor, aprobacionFilaFecha)
+  const activityData = ACTIVITY_FIELDS.map(f => ({
+    key: f.key,
+    label: f.label,
+    date: actividadFecha(client.id, mes, f.key),
+    note: actividadNota(client.id, mes, f.key)?.nota || '',
+  }))
+  const informe = buildInformeEjecutivo({
     clientName: client.brand_name,
     periodLabel,
-    rows: buildResumenRows(client.id, mes, sections, networks, allRowsFor, aprobacionFilaFecha),
+    mes,
+    period,
+    mode: config.mode,
+    vectors: config.vectors,
+    planNombre: (config.plan_nombre || '').trim(),
+    isFirstMonth: !!client.mes_inicio && client.mes_inicio === mes,
     networks,
-    activityRows: ACTIVITY_FIELDS.map(f => ({
-      label: f.label,
-      date: actividadFecha(client.id, mes, f.key),
-      note: actividadNota(client.id, mes, f.key)?.nota || '',
-    })),
+    sections,
+    rows: informeRows,
+    activity: activityData,
   })
+  const conteo = { posts: 0, videos: 0, otras: 0 }
+  informe.stats.rows?.forEach(r => { if (r.tipo === 'post') conteo.posts++; else if (r.tipo === 'video') conteo.videos++; else conteo.otras++ })
+  const planTxt = [
+    (config.plan_nombre || '').trim() || null,
+    config.mode !== 'semanas' && config.vectors ? `${config.vectors} ${config.vectors === 1 ? 'vector creativo' : 'vectores creativos'}` : null,
+  ].filter(Boolean).join(' · ') + (informe.stats.total
+    ? ` (${[conteo.posts && `${conteo.posts} ${conteo.posts === 1 ? 'post' : 'posts'}`, conteo.videos && `${conteo.videos} ${conteo.videos === 1 ? 'video' : 'videos'}`, conteo.otras && `${conteo.otras} ${conteo.otras === 1 ? 'pieza adicional' : 'piezas adicionales'}`].filter(Boolean).join(' + ')})`
+    : '')
+  const informeHeader = {
+    client: client.brand_name,
+    periodLabel,
+    grupoTxt: GRUPO_FACTURACION[period] || '',
+    planTxt: planTxt.trim(),
+  }
+  const printRowsBySection = {}
+  sections.forEach(sec => { printRowsBySection[sec.id] = informeRows.filter(r => r.seccionId === sec.id && r.__registrada) })
+  const notaTabla = (config.nota_general || '').trim() || notaAutomatica(informe.stats, periodLabel)
 
   async function handleDownload() {
-    if (!panelRef.current || downloading) return
+    if (!informeContentRef.current || downloading) return
     setDownloading(true)
-
-    // Mientras se genera el PDF, se quita el recorte por scroll (alto y ancho)
-    // del contenedor de la tabla para que la captura incluya TODO.
-    const scrollEl = tableScrollRef.current
-    const prevStyle = scrollEl ? { maxHeight: scrollEl.style.maxHeight, overflow: scrollEl.style.overflow } : null
-    if (scrollEl) { scrollEl.style.maxHeight = 'none'; scrollEl.style.overflow = 'visible' }
-
     try {
-      const [{ default: html2canvas }, jspdfMod] = await Promise.all([import('html2canvas'), import('jspdf')])
-      const jsPDF = jspdfMod.jsPDF || jspdfMod.default
-      const A4 = { w: 595.28, h: 841.89 }
-      const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' })
-
-      async function capture(el, widthOverride) {
-        const w = widthOverride || Math.max(el.scrollWidth, el.offsetWidth)
-        const h = Math.max(el.scrollHeight, el.offsetHeight)
-        return html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: w, height: h, windowWidth: w, windowHeight: h })
-      }
-
-      // Página 1: resumen interpretativo (una hoja tipo carta, se reparte hacia
-      // abajo si el contenido no cabe entero, nunca se corta el ancho).
-      if (resumenRef.current) {
-        const canvas = await capture(resumenRef.current)
-        const ptPerPx = A4.w / canvas.width
-        const chunkPx = A4.h / ptPerPx
-        let y = 0, first = true
-        while (y < canvas.height - 0.5) {
-          const sliceH = Math.min(chunkPx, canvas.height - y)
-          const slice = document.createElement('canvas')
-          slice.width = canvas.width; slice.height = Math.round(sliceH)
-          slice.getContext('2d').drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
-          if (!first) doc.addPage([A4.w, A4.h], 'portrait')
-          first = false
-          doc.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, A4.w, sliceH * ptPerPx)
-          y += sliceH
-        }
-      }
-
-      // Páginas de la tabla: horizontal (más ancho disponible), fila por fila,
-      // así ninguna fila queda partida entre dos páginas. El encabezado de la
-      // tabla se repite arriba de cada página nueva.
-      const pageW = A4.h, pageH = A4.w
-      doc.addPage([A4.w, A4.h], 'landscape')
-      let cursorY = 0
-      let tablePtPerPx = null
-      let headerCanvas = null
-
-      // links: [{ url, x, y, w, h }] en px CSS relativos al bloque capturado
-      function placeBlock(canvas, ptPerPx, { repeatHeader, links } = {}) {
-        const hPt = canvas.height * ptPerPx
-        if (cursorY > 0 && cursorY + hPt > pageH) {
-          doc.addPage([A4.w, A4.h], 'landscape')
-          cursorY = 0
-          if (repeatHeader && headerCanvas) placeBlock(headerCanvas, tablePtPerPx)
-        }
-        doc.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, cursorY, pageW, hPt)
-        // html2canvas captura a scale 2: 1px CSS = 2px del canvas
-        const k = 2 * ptPerPx
-        ;(links || []).forEach(l => {
-          try { doc.link(l.x * k, cursorY + l.y * k, l.w * k, l.h * k, { url: l.url }) } catch { /* noop */ }
-        })
-        cursorY += hPt
-      }
-
-      function collectLinks(el) {
-        const box = el.getBoundingClientRect()
-        return Array.from(el.querySelectorAll('a[data-pdf-link]')).map(a => {
-          const r = a.getBoundingClientRect()
-          return { url: a.getAttribute('data-pdf-link'), x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height }
-        }).filter(l => l.w > 0 && l.h > 0)
-      }
-
-      if (activityBlockRef.current) {
-        const canvas = await capture(activityBlockRef.current)
-        placeBlock(canvas, pageW / canvas.width)
-      }
-
-      const tableEl = tableScrollRef.current?.querySelector('table')
-      if (tableEl) {
-        const fullW = Math.max(tableEl.scrollWidth, tableEl.offsetWidth)
-        const theadEl = tableEl.querySelector('thead')
-        if (theadEl) {
-          headerCanvas = await capture(theadEl, fullW)
-          tablePtPerPx = pageW / headerCanvas.width
-          placeBlock(headerCanvas, tablePtPerPx)
-        }
-        const sectionEls = Array.from(tableEl.querySelectorAll('tbody[data-pdf-section]'))
-        for (const sectionEl of sectionEls) {
-          // Oculta temporalmente la fila de "Añadir fila" (no debe salir en el informe)
-          // ...y los controles de edición de enlaces (input "pegar enlace" y ✕)
-          const skipRows = Array.from(sectionEl.querySelectorAll('[data-pdf-skip], [data-pdf-hide]'))
-          const prevDisplay = skipRows.map(r => r.style.display)
-          skipRows.forEach(r => { r.style.display = 'none' })
-          const sectionCanvas = await capture(sectionEl, fullW)
-          const sectionLinks = collectLinks(sectionEl)
-          skipRows.forEach((r, i) => { r.style.display = prevDisplay[i] })
-          placeBlock(sectionCanvas, tablePtPerPx || pageW / sectionCanvas.width, { repeatHeader: true, links: sectionLinks })
-        }
-      }
-
-      if (noteBoxRef.current) {
-        const canvas = await capture(noteBoxRef.current)
-        placeBlock(canvas, pageW / canvas.width)
-      }
-
-      const base = `Informe_${client.brand_name}_${periodLabel}`.replace(/[^\w-]+/g, '_')
-      doc.save(`${base}.pdf`)
+      const base = `InformeContenidos_${client.brand_name}_${periodLabel}`.replace(/[^\w-]+/g, '_').replace(/_+/g, '_')
+      await generarInformePdf({
+        contentEl: informeContentRef.current,
+        tableEl: printTableRef.current,
+        pageClass: pdfPageClass,
+        pageContentClass: pdfPageContentClass,
+        compactClass: pdfCompactClass,
+        fileName: `${base}.pdf`,
+      })
     } catch (err) {
       console.error(err)
       alert('No se pudo generar el informe. Revisa la consola para más detalle.')
     } finally {
-      if (scrollEl && prevStyle) { scrollEl.style.maxHeight = prevStyle.maxHeight; scrollEl.style.overflow = prevStyle.overflow }
       setDownloading(false)
     }
   }
@@ -377,7 +311,7 @@ function ClientPanel({
             </button>
           )}
           <button className={`btn btn-ghost ${styles.resumenToggle}`} style={{ fontSize: 12 }} onClick={onToggleResumen}>
-            <NoteIcon /> {showResumen ? 'Ocultar resumen' : 'Ver resumen'}
+            <NoteIcon /> {showResumen ? 'Ocultar informe' : 'Ver informe'}
           </button>
           <button className={`btn btn-ghost ${styles.downloadBtn}`} style={{ fontSize: 12 }} onClick={handleDownload} disabled={downloading}>
             <DownloadIcon /> {downloading ? 'Generando...' : 'Descargar informe'}
@@ -385,9 +319,25 @@ function ClientPanel({
         </div>
       </div>
 
-      {/* Resumen: visible en pantalla si se activa, y siempre capturado para el PDF (fuera de vista si está oculto) */}
-      <div ref={resumenRef} style={!showResumen ? { position: 'absolute', left: -99999, top: 0, width: 780 } : undefined}>
-        <ResumenView client={client} period={period} periodLabel={periodLabel} data={resumenData} />
+      {/* Informe ejecutivo en pantalla (si se activa) */}
+      {showResumen && <InformeScreen header={informeHeader} blocks={informe.blocks} />}
+
+      {/* Fuente para el PDF: contenido del informe y tabla limpia, fuera de vista */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: -100000, top: 0, width: 660 }}>
+        <InformeContent ref={informeContentRef} header={informeHeader} blocks={informe.blocks} />
+      </div>
+      <div aria-hidden="true" style={{ position: 'absolute', left: -100000, top: 0 }}>
+        <PrintTable
+          ref={printTableRef}
+          client={client.brand_name}
+          periodLabel={periodLabel}
+          activity={activityData}
+          sections={sections}
+          rowsBySection={printRowsBySection}
+          networks={networks}
+          hasVector={hasVector}
+          nota={notaTabla}
+        />
       </div>
 
       <div ref={panelRef}>
@@ -443,79 +393,46 @@ function ClientPanel({
   )
 }
 
-// Arma las filas "resueltas" (con la fecha de aprobación ya conectada a la Matriz
-// cuando corresponde) para alimentar el resumen interpretativo.
-function buildResumenRows(clientId, mes, sections, networks, allRowsFor, aprobacionFilaFecha) {
+// Filas "resueltas" del cronograma (aprobación conectada a la Matriz cuando
+// corresponde) para el informe ejecutivo y la tabla del PDF.
+function buildInformeRows(clientId, mes, sections, networks, allRowsFor, aprobacionFilaFecha) {
   const all = allRowsFor(clientId, mes)
-  const bySeccion = {}
-  sections.forEach(sec => { bySeccion[sec.id] = all.filter(r => r.seccion === sec.id).sort((a, b) => (a.position || 0) - (b.position || 0)) })
-
   const out = []
   sections.forEach(sec => {
-    const rows = bySeccion[sec.id] || []
+    const rows = all.filter(r => r.seccion === sec.id).sort((a, b) => (a.position || 0) - (b.position || 0))
     const countByTipo = {}
     rows.forEach(r => {
       const idx = r.tipo ? (countByTipo[r.tipo] = (countByTipo[r.tipo] ?? -1) + 1) : null
       const manualAprob = r.aprobacion_fecha ? String(r.aprobacion_fecha).slice(0, 10) : null
-      const aprobacionFecha = manualAprob || (AUTO_APROB_SECTIONS.includes(sec.id) && r.tipo
+      const aprobacion = manualAprob || (AUTO_APROB_SECTIONS.includes(sec.id) && r.tipo
         ? aprobacionFilaFecha(clientId, mes, sec.id, r.tipo, idx)
         : null)
+      const pubs = {}
+      const posteos = {}
+      networks.forEach(n => {
+        pubs[n.id] = r[n.field + '_fecha'] || null
+        posteos[n.id] = r[n.field + '_posteo'] || ''
+      })
+      const tipo = inferTipo(r)
       out.push({
+        id: r.id,
         seccionId: sec.id,
         seccionLabel: sec.label,
-        codigo: r.codigo,
+        seccionShort: sec.short,
+        vector: r.vector,
+        tipo,
         creativo: r.creativo,
-        aprobacionFecha,
-        fb_fecha: r.fb_fecha, ig_fecha: r.ig_fecha, tt_fecha: r.tt_fecha,
+        codigo: r.codigo,
+        enlaces: r.enlaces || [],
+        aprobacion,
+        pubs,
+        posteos,
         observaciones: r.observaciones,
+        __registrada: !!(r.codigo || r.creativo || aprobacion || (r.enlaces || []).length || Object.values(pubs).some(Boolean) || r.observaciones),
       })
     })
   })
   return out
-}
-
-function ResumenView({ client, period, periodLabel, data }) {
-  const now = new Date()
-  const genDate = now.toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  const grupoTxt = GRUPO_FACTURACION[period] || ''
-  return (
-    <div className={styles.resumenOuter}>
-      <div className={styles.resumenPage}>
-        <div className={styles.resumenContent}>
-          <div className={styles.resumenTitle}>Informe de contenidos y programación</div>
-          <div className={styles.resumenMeta}>
-            <div><strong>Cliente:</strong> {client.brand_name}</div>
-            <div><strong>Periodo analizado:</strong> {periodLabel}</div>
-            {grupoTxt && <div><strong>Grupo de facturación:</strong> {grupoTxt}</div>}
-            <div><strong>Generado:</strong> {genDate}</div>
-          </div>
-          <div className={styles.resumenIntro}>Este resumen interpreta, a modo de informe, la información cargada hasta ahora en el cronograma de <strong>{client.brand_name}</strong> para el periodo <strong>{periodLabel}</strong>.</div>
-
-          <div className={styles.resumenH2}>Estado general</div>
-          {data.estadoGeneral.map((p, i) => <div key={i} className={styles.resumenP}>{renderBold(p)}</div>)}
-
-          <div className={styles.resumenH2}>Publicaciones por red</div>
-          {data.publicacionesPorRed.map((p, i) => <div key={i} className={styles.resumenP}>{renderBold(p)}</div>)}
-
-          <div className={styles.resumenH2}>Actividad</div>
-          {data.actividad.map((p, i) => <div key={i} className={styles.resumenP}>{renderBold(p)}</div>)}
-
-          <div className={styles.resumenH2}>Observaciones</div>
-          <div className={styles.resumenP}>{renderBold(data.observaciones.intro)}</div>
-          {data.observaciones.items.length > 0 && (
-            <ul className={styles.resumenUl}>
-              {data.observaciones.items.map((it, i) => <li key={i}><strong>{it.codigo}</strong> — {it.texto}</li>)}
-            </ul>
-          )}
-          {data.observaciones.moreCount > 0 && (
-            <div className={styles.resumenMore}>… y {data.observaciones.moreCount} observación(es) más. Ver detalle en la tabla adjunta.</div>
-          )}
-
-          <div className={styles.resumenFooter}>Nota: este resumen interpreta únicamente la información cargada hasta el momento de la descarga. Actualízalo conforme se registren nuevos datos en el cronograma.</div>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 function ClientNote({ client, config, saveConfig }) {
@@ -702,31 +619,6 @@ function SectionRows({ section, clientId, mes, config, hasVector, networks, rows
   )
 }
 
-// Etiqueta corta según la plataforma del enlace (el URL completo queda en el
-// tooltip y como hipervínculo, también en el PDF descargado).
-const LINK_PLATFORMS = [
-  [/instagram\.com/i, 'Instagram'],
-  [/tiktok\.com/i, 'TikTok'],
-  [/(facebook\.com|fb\.watch|fb\.com)/i, 'Facebook'],
-  [/(youtube\.com|youtu\.be)/i, 'YouTube'],
-  [/(drive|docs)\.google\.com/i, 'Drive'],
-  [/canva\.(com|link)/i, 'Canva'],
-  [/(linkedin\.com|lnkd\.in)/i, 'LinkedIn'],
-  [/(twitter\.com|x\.com)/i, 'X'],
-  [/(wa\.me|whatsapp\.com)/i, 'WhatsApp'],
-  [/(dropbox\.com)/i, 'Dropbox'],
-  [/(figma\.com)/i, 'Figma'],
-]
-function linkLabels(urls) {
-  const base = (urls || []).map(u => (LINK_PLATFORMS.find(([re]) => re.test(u)) || [null, 'Enlace'])[1])
-  const totals = base.reduce((acc, l) => ({ ...acc, [l]: (acc[l] || 0) + 1 }), {})
-  const seen = {}
-  return base.map(l => {
-    seen[l] = (seen[l] || 0) + 1
-    return totals[l] > 1 ? `${l} ${seen[l]}` : l
-  })
-}
-
 // Lista de enlaces reales (clicables), con opción de añadir varios
 function LinksEditor({ value, onCommit }) {
   const [draft, setDraft] = useState('')
@@ -791,6 +683,16 @@ function ConfigModal({ client, config, onSave, onClose }) {
           <button className={styles.closeBtn} onClick={onClose}><CloseIcon /></button>
         </div>
         <div className={styles.modalForm}>
+          <div>
+            <div className={styles.fieldLabel}>Plan contratado (aparece en el informe)</div>
+            <input
+              className={styles.planInput}
+              placeholder="Ej. IGLÜ Steps"
+              value={draft.plan_nombre || ''}
+              onChange={e => setDraft(d => ({ ...d, plan_nombre: e.target.value }))}
+            />
+          </div>
+
           <div>
             <div className={styles.fieldLabel}>Tipo de tabla</div>
             <div className={styles.modeSwitch}>
