@@ -5,6 +5,9 @@ import {
 } from '../hooks/useCronogramaContenidos'
 import { buildInformeEjecutivo, notaAutomatica, inferTipo } from '../utils/informeEjecutivo'
 import { generarInformePdf } from '../utils/informePdf'
+import { useTablaLayout } from '../hooks/useTablaLayout'
+import TablaLayoutModal from '../components/tablas/TablaLayoutModal'
+import CustomCell from '../components/tablas/CustomCell'
 import { linkLabels } from '../utils/linkLabels'
 import { InformeScreen, InformeContent, PrintTable, pdfPageClass, pdfPageContentClass, pdfCompactClass } from '../components/informe/InformePrint'
 import { cycleLabel, currentMesBase, shiftMesBase } from '../utils/cycleLabel'
@@ -105,8 +108,55 @@ function BufferedField({ value, onCommit, className, placeholder, as = 'input', 
   )
 }
 
+// ── Títulos editables de la tabla (admin) ───────────────────────────────────
+const TL_DEFAULTS = {
+  title_bar: 'INFORME: CONTENIDOS Y PROGRAMACIÓN',
+  title_actividad: 'ACTIVIDAD',
+  group_creativo: 'Creativo',
+  group_programacion: 'Programación',
+  col_vector: 'Vector',
+  col_creativo: '# Creativo',
+  col_codigo: 'Código',
+  col_enlaces: 'Enlace(s)',
+  col_aprobacion: 'Aprobación',
+  sub_fecha: 'Fecha',
+  sub_posteo: 'Posteo',
+  col_observaciones: 'Observaciones',
+  nota_label: 'Nota importante',
+  ...Object.fromEntries(ACTIVITY_FIELDS.map(f => [`act_${f.key}`, f.label])),
+  ...Object.fromEntries(NETWORK_DEFS.map(n => [`net_${n.id}`, n.label])),
+  ...Object.fromEntries([...STAGE_DEFS, ...WEEK_DEFS.filter(w => w.id !== 'extra')].flatMap(s => [[`sec_${s.id}`, s.label], [`sec_${s.id}_short`, s.short]])),
+}
+const TL_HIDEABLE = ['col_vector', 'col_creativo', 'col_codigo', 'col_enlaces', 'col_aprobacion', 'sub_posteo', 'col_observaciones']
+const tlItem = key => ({ key, default: TL_DEFAULTS[key], hideable: TL_HIDEABLE.includes(key) })
+const TL_SECTIONS = [
+  { title: 'Encabezados', items: ['title_bar', 'title_actividad', 'group_creativo', 'group_programacion', 'nota_label'].map(tlItem) },
+  { title: 'Columnas (título y si se ve)', items: ['col_vector', 'col_creativo', 'col_codigo', 'col_enlaces', 'col_aprobacion', 'sub_fecha', 'sub_posteo', 'col_observaciones'].map(tlItem) },
+  { title: 'Actividad', items: ACTIVITY_FIELDS.map(f => tlItem(`act_${f.key}`)) },
+  { title: 'Redes', items: NETWORK_DEFS.map(n => tlItem(`net_${n.id}`)) },
+  { title: 'Etapas y semanas (nombre · banda lateral)', items: [...STAGE_DEFS, ...WEEK_DEFS.filter(w => w.id !== 'extra')].flatMap(s => [tlItem(`sec_${s.id}`), tlItem(`sec_${s.id}_short`)]) },
+]
+const TL_CUSTOM_GROUPS = [
+  { value: 'creativo', label: 'En: Creativo' },
+  { value: 'final', label: 'Antes de Observaciones' },
+]
+
+// Objeto de "layout" que se pasa a la tabla (pantalla y PDF)
+function buildTableLayout(tl) {
+  const t = key => tl.labelFor(key, TL_DEFAULTS[key])
+  return {
+    t,
+    show: key => !tl.isHidden(key),
+    customCreativo: tl.customIn('creativo').filter(c => !tl.isHidden(c.id)),
+    customFinal: tl.customIn('final').filter(c => !tl.isHidden(c.id)),
+  }
+}
+
 export default function CronogramaContenidosPage() {
-  const { hasPageAccess } = useAuth()
+  const { hasPageAccess, isAdmin } = useAuth()
+  const tl = useTablaLayout('informe_contenidos')
+  const tableLayout = buildTableLayout(tl)
+  const [showLayout, setShowLayout] = useState(false)
   // Admin siempre; otra persona solo si un admin le dio el permiso de Estructura (en Equipo)
   const canEditStructure = hasPageAccess('cronograma_estructura')
   const {
@@ -179,8 +229,10 @@ export default function CronogramaContenidosPage() {
               periodLabel={cycleLabel(mesAno, period)}
               canEditStructure={canEditStructure}
               config={getConfig(activeClient.id)}
-              sections={sectionsForClient(activeClient.id)}
-              networks={networksForClient(activeClient.id)}
+              sections={sectionsForClient(activeClient.id).map(s => ({ ...s, label: tableLayout.t(`sec_${s.id}`) || s.label, short: tableLayout.t(`sec_${s.id}_short`) || s.short }))}
+              networks={networksForClient(activeClient.id).map(n => ({ ...n, label: tableLayout.t(`net_${n.id}`) || n.label }))}
+              tableLayout={tableLayout}
+              onOpenLayout={isAdmin ? () => setShowLayout(true) : null}
               hasVector={hasVectorColumn(activeClient.id)}
               rowsFor={rowsFor}
               allRowsFor={allRowsFor}
@@ -200,6 +252,16 @@ export default function CronogramaContenidosPage() {
               onToggleResumen={() => setShowResumen(v => !v)}
             />
           )}
+          {showLayout && (
+            <TablaLayoutModal
+              title="Editar tabla · Informe de Contenidos"
+              sections={TL_SECTIONS}
+              customGroups={TL_CUSTOM_GROUPS}
+              layout={tl.layout}
+              onSave={tl.saveLayout}
+              onClose={() => setShowLayout(false)}
+            />
+          )}
         </>
       )}
     </div>
@@ -215,6 +277,7 @@ function ClientPanel({
   client, mes, period, periodLabel, canEditStructure, config, sections, networks, hasVector,
   rowsFor, allRowsFor, addRow, ensureSeeded, updateRow, deleteRow, actividadFecha, actividadNota, saveActividadNota,
   aprobacionFilaFecha, saveConfig, onOpenConfig, showConfig, onCloseConfig, showResumen, onToggleResumen,
+  tableLayout: L, onOpenLayout,
 }) {
   const panelRef = useRef(null)
   const informeContentRef = useRef(null)
@@ -235,7 +298,7 @@ function ClientPanel({
   const informeRows = buildInformeRows(client.id, mes, sections, networks, allRowsFor, aprobacionFilaFecha)
   const activityData = ACTIVITY_FIELDS.map(f => ({
     key: f.key,
-    label: f.label,
+    label: L.t(`act_${f.key}`),
     date: actividadFecha(client.id, mes, f.key),
     note: actividadNota(client.id, mes, f.key)?.nota || '',
   }))
@@ -310,6 +373,11 @@ function ClientPanel({
               <GearIcon /> Estructura
             </button>
           )}
+          {onOpenLayout && (
+            <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onOpenLayout}>
+              ✏️ Editar tabla
+            </button>
+          )}
           <button className={`btn btn-ghost ${styles.resumenToggle}`} style={{ fontSize: 12 }} onClick={onToggleResumen}>
             <NoteIcon /> {showResumen ? 'Ocultar informe' : 'Ver informe'}
           </button>
@@ -337,12 +405,14 @@ function ClientPanel({
           networks={networks}
           hasVector={hasVector}
           nota={notaTabla}
+          layout={L}
         />
       </div>
 
       <div ref={panelRef}>
         <div ref={activityBlockRef}>
           <ActivityBlock
+            L={L}
             client={client}
             mes={mes}
             periodLabel={periodLabel}
@@ -357,7 +427,7 @@ function ClientPanel({
             <div className={styles.empty}>Este cliente no tiene etapas o semanas configuradas. Usa "Estructura" para elegirlas.</div>
           ) : (
             <table className={styles.table}>
-              <TableHead hasVector={hasVector} networks={networks} />
+              <TableHead hasVector={hasVector} networks={networks} L={L} />
               {sections.map(sec => (
                 <tbody key={sec.id} data-pdf-section={sec.id}>
                   <SectionRows
@@ -367,12 +437,13 @@ function ClientPanel({
                     config={config}
                     hasVector={hasVector}
                     networks={networks}
+                    L={L}
                     rowsFor={rowsFor}
                     addRow={addRow}
                     updateRow={updateRow}
                     deleteRow={deleteRow}
                     aprobacionFilaFecha={aprobacionFilaFecha}
-                    totalCols={1 + (hasVector ? 1 : 0) + 4 + networks.length * 2 + 1 + 1}
+                    totalCols={tableColCount(hasVector, networks, L) + 1}
                   />
                 </tbody>
               ))}
@@ -381,7 +452,7 @@ function ClientPanel({
         </div>
 
         <div className={styles.noteBox} ref={noteBoxRef}>
-          <div className={styles.noteLabel}>Nota importante</div>
+          <div className={styles.noteLabel}>{L.t('nota_label')}</div>
           <ClientNote client={client} config={config} saveConfig={saveConfig} />
         </div>
       </div>
@@ -428,6 +499,7 @@ function buildInformeRows(clientId, mes, sections, networks, allRowsFor, aprobac
         pubs,
         posteos,
         observaciones: r.observaciones,
+        extra: r.extra || {},
         __registrada: !!(r.codigo || r.creativo || aprobacion || (r.enlaces || []).length || Object.values(pubs).some(Boolean) || r.observaciones),
       })
     })
@@ -448,17 +520,17 @@ function ClientNote({ client, config, saveConfig }) {
   )
 }
 
-function ActivityBlock({ client, mes, periodLabel, actividadFecha, actividadNota, saveActividadNota }) {
+function ActivityBlock({ L, client, mes, periodLabel, actividadFecha, actividadNota, saveActividadNota }) {
   return (
     <div className={styles.infoBlock}>
-      <div className={styles.infoTitleBar}>INFORME: CONTENIDOS Y PROGRAMACIÓN</div>
+      <div className={styles.infoTitleBar}>{L.t('title_bar')}</div>
       <div className={styles.idGrid}>
         <div className={styles.cellLabel}>CLIENTE:</div>
         <div className={styles.cellValue}>{client.brand_name}</div>
         <div className={styles.cellLabel}>PERIODO:</div>
         <div className={styles.cellValue}>{periodLabel}</div>
       </div>
-      <div className={`${styles.infoTitleBar} ${styles.sub}`}>ACTIVIDAD</div>
+      <div className={`${styles.infoTitleBar} ${styles.sub}`}>{L.t('title_actividad')}</div>
       <div className={styles.activityGrid}>
         {ACTIVITY_FIELDS.map(f => (
           <ActivityRow
@@ -466,7 +538,7 @@ function ActivityBlock({ client, mes, periodLabel, actividadFecha, actividadNota
             client={client}
             mes={mes}
             campo={f.key}
-            label={f.label}
+            label={L.t(`act_${f.key}`)}
             fecha={actividadFecha(client.id, mes, f.key)}
             nota={actividadNota(client.id, mes, f.key)}
             saveActividadNota={saveActividadNota}
@@ -508,29 +580,39 @@ function ActivityRow({ client, mes, campo, label, fecha, nota, saveActividadNota
   )
 }
 
-function TableHead({ hasVector, networks }) {
+// Número de columnas de datos (sin la columna de acciones)
+function tableColCount(hasVector, networks, L) {
+  const vec = hasVector && L.show('col_vector') ? 1 : 0
+  const cre = ['col_creativo', 'col_codigo', 'col_enlaces', 'col_aprobacion'].filter(L.show).length + L.customCreativo.length
+  const net = networks.length * (L.show('sub_posteo') ? 2 : 1)
+  return 1 + vec + cre + net + L.customFinal.length + (L.show('col_observaciones') ? 1 : 0)
+}
+
+function TableHead({ hasVector, networks, L }) {
+  const creCols = ['col_creativo', 'col_codigo', 'col_enlaces', 'col_aprobacion'].filter(L.show)
+  const creSpan = creCols.length + L.customCreativo.length
+  const showPosteo = L.show('sub_posteo')
   return (
     <thead>
       <tr>
         <th className={styles.hdTeal} rowSpan={3} style={{ width: 30 }}></th>
-        {hasVector && <th className={styles.hdTeal} rowSpan={3}>Vector</th>}
-        <th className={styles.hdCoral} colSpan={4}>Creativo</th>
-        {networks.length > 0 && <th className={styles.hdTeal} colSpan={networks.length * 2}>Programación</th>}
-        <th className={styles.hdTeal} rowSpan={3}>Observaciones</th>
+        {hasVector && L.show('col_vector') && <th className={styles.hdTeal} rowSpan={3}>{L.t('col_vector')}</th>}
+        {creSpan > 0 && <th className={styles.hdCoral} colSpan={creSpan}>{L.t('group_creativo')}</th>}
+        {networks.length > 0 && <th className={styles.hdTeal} colSpan={networks.length * (showPosteo ? 2 : 1)}>{L.t('group_programacion')}</th>}
+        {L.customFinal.map(c => <th key={c.id} className={styles.hdTeal} rowSpan={3}>{c.label}</th>)}
+        {L.show('col_observaciones') && <th className={styles.hdTeal} rowSpan={3}>{L.t('col_observaciones')}</th>}
         <th className={styles.hdTeal} rowSpan={3} style={{ width: 30 }}></th>
       </tr>
       <tr>
-        <th className={styles.hdCoralSoft} rowSpan={2}># Creativo</th>
-        <th className={styles.hdCoralSoft} rowSpan={2}>Código</th>
-        <th className={styles.hdCoralSoft} rowSpan={2}>Enlace(s)</th>
-        <th className={styles.hdCoralSoft} rowSpan={2}>Aprobación</th>
-        {networks.map(n => <th key={n.id} className={NET_HEAD[n.id] || styles.hdTeal} colSpan={2}>{n.label}</th>)}
+        {creCols.map(k => <th key={k} className={styles.hdCoralSoft} rowSpan={2}>{L.t(k)}</th>)}
+        {L.customCreativo.map(c => <th key={c.id} className={styles.hdCoralSoft} rowSpan={2}>{c.label}</th>)}
+        {networks.map(n => <th key={n.id} className={NET_HEAD[n.id] || styles.hdTeal} colSpan={showPosteo ? 2 : 1}>{n.label}</th>)}
       </tr>
       <tr>
         {networks.map(n => (
           <Fragment key={n.id}>
-            <th className={NET_HEAD_SOFT[n.id] || styles.hdTeal}>Fecha</th>
-            <th className={NET_HEAD_SOFT[n.id] || styles.hdTeal}>Posteo</th>
+            <th className={NET_HEAD_SOFT[n.id] || styles.hdTeal}>{L.t('sub_fecha')}</th>
+            {showPosteo && <th className={NET_HEAD_SOFT[n.id] || styles.hdTeal}>{L.t('sub_posteo')}</th>}
           </Fragment>
         ))}
       </tr>
@@ -538,7 +620,7 @@ function TableHead({ hasVector, networks }) {
   )
 }
 
-function SectionRows({ section, clientId, mes, config, hasVector, networks, rowsFor, addRow, updateRow, deleteRow, aprobacionFilaFecha, totalCols }) {
+function SectionRows({ section, clientId, mes, config, hasVector, networks, L, rowsFor, addRow, updateRow, deleteRow, aprobacionFilaFecha, totalCols }) {
   const rows = rowsFor(clientId, mes, section.id)
   const secClass = styles[SEC_CLASS[section.id]] || ''
   const autoAprob = AUTO_APROB_SECTIONS.includes(section.id)
@@ -566,21 +648,27 @@ function SectionRows({ section, clientId, mes, config, hasVector, networks, rows
                 <div className={styles.etapaBand}>{section.short}</div>
               </td>
             )}
-            {hasVector && (
+            {hasVector && L.show('col_vector') && (
               <td className={`${styles.cellEditable} ${styles.colVector}`}>
                 <BufferedField className={styles.cellInput} value={row.vector || ''} placeholder="vector" onCommit={v => updateRow(row.id, { vector: v })} />
               </td>
             )}
-            <td className={`${styles.cellEditable} ${styles.colCreativo}`}>
-              <BufferedField className={styles.cellInput} value={row.creativo || ''} placeholder="# creativo" onCommit={v => updateRow(row.id, { creativo: v })} />
-            </td>
-            <td className={`${styles.cellEditable} ${styles.colCodigo}`}>
-              <BufferedField className={styles.cellInput} value={row.codigo || ''} placeholder="código" onCommit={v => updateRow(row.id, { codigo: v })} />
-            </td>
-            <td className={styles.linksCell}>
-              <LinksEditor value={row.enlaces || []} onCommit={v => updateRow(row.id, { enlaces: v })} />
-            </td>
-            <td className={styles.aprobRO}>
+            {L.show('col_creativo') && (
+              <td className={`${styles.cellEditable} ${styles.colCreativo}`}>
+                <BufferedField className={styles.cellInput} value={row.creativo || ''} placeholder="# creativo" onCommit={v => updateRow(row.id, { creativo: v })} />
+              </td>
+            )}
+            {L.show('col_codigo') && (
+              <td className={`${styles.cellEditable} ${styles.colCodigo}`}>
+                <BufferedField className={styles.cellInput} value={row.codigo || ''} placeholder="código" onCommit={v => updateRow(row.id, { codigo: v })} />
+              </td>
+            )}
+            {L.show('col_enlaces') && (
+              <td className={styles.linksCell}>
+                <LinksEditor value={row.enlaces || []} onCommit={v => updateRow(row.id, { enlaces: v })} />
+              </td>
+            )}
+            {L.show('col_aprobacion') && <td className={styles.aprobRO}>
               <input
                 type="date"
                 className={styles.dateInput}
@@ -588,20 +676,34 @@ function SectionRows({ section, clientId, mes, config, hasVector, networks, rows
                 value={row.aprobacion_fecha ? String(row.aprobacion_fecha).slice(0, 10) : toLocalDateInput(aprobFecha)}
                 onChange={e => updateRow(row.id, { aprobacion_fecha: e.target.value || null })}
               />
-            </td>
+            </td>}
+            {L.customCreativo.map(c => (
+              <td key={c.id} className={styles.cellEditable}>
+                <CustomCell tipo={c.tipo} value={row.extra?.[c.id]} inputClassName={styles.cellInput} onCommit={v => updateRow(row.id, { extra: { ...(row.extra || {}), [c.id]: v } })} />
+              </td>
+            ))}
             {networks.map(n => (
               <Fragment key={n.id}>
                 <td className={styles.dateCol}>
                   <input type="date" className={styles.dateInput} value={toDateInputValue(row[n.field + '_fecha'])} onChange={e => updateRow(row.id, { [n.field + '_fecha']: e.target.value || null })} />
                 </td>
-                <td className={styles.cellEditable}>
-                  <BufferedField as="textarea" rows={1} className={styles.cellTextarea} value={row[n.field + '_posteo'] || ''} placeholder="posteo" onCommit={v => updateRow(row.id, { [n.field + '_posteo']: v })} />
-                </td>
+                {L.show('sub_posteo') && (
+                  <td className={styles.cellEditable}>
+                    <BufferedField as="textarea" rows={1} className={styles.cellTextarea} value={row[n.field + '_posteo'] || ''} placeholder="posteo" onCommit={v => updateRow(row.id, { [n.field + '_posteo']: v })} />
+                  </td>
+                )}
               </Fragment>
             ))}
-            <td className={`${styles.cellEditable} ${styles.colObs}`}>
-              <BufferedField as="textarea" rows={1} className={styles.cellTextarea} value={row.observaciones || ''} placeholder="observaciones" onCommit={v => updateRow(row.id, { observaciones: v })} />
-            </td>
+            {L.customFinal.map(c => (
+              <td key={c.id} className={styles.cellEditable}>
+                <CustomCell tipo={c.tipo} value={row.extra?.[c.id]} inputClassName={styles.cellInput} onCommit={v => updateRow(row.id, { extra: { ...(row.extra || {}), [c.id]: v } })} />
+              </td>
+            ))}
+            {L.show('col_observaciones') && (
+              <td className={`${styles.cellEditable} ${styles.colObs}`}>
+                <BufferedField as="textarea" rows={1} className={styles.cellTextarea} value={row.observaciones || ''} placeholder="observaciones" onCommit={v => updateRow(row.id, { observaciones: v })} />
+              </td>
+            )}
             <td className={styles.actionsCell}>
               <button className={styles.rowDel} title="Quitar fila" onClick={() => deleteRow(row.id)}><TrashIcon /></button>
             </td>

@@ -1,5 +1,6 @@
 import { forwardRef, Fragment } from 'react'
 import { linkLabels } from '../../utils/linkLabels'
+import { customValueText } from '../tablas/CustomCell'
 import styles from './InformePrint.module.css'
 
 // "texto con **negrita**" → nodos con <strong>
@@ -86,22 +87,42 @@ export const pdfCompactClass = styles.compact
 const SEC_COLOR = { fria: '#2F6D9E', caliente: '#B24B2C', extra: '#6E52B5', s1: '#2F8F6E', s2: '#C99A2E', s3: '#C15B87', s4: '#5B63C4' }
 const SEC_BG = { fria: '#E7F1F8', caliente: '#FBEAE3', extra: '#EFEAF8', s1: '#E6F3EE', s2: '#F8F0DD', s3: '#F7E6EE', s4: '#E9EAF8' }
 
-export const PrintTable = forwardRef(function PrintTable({ client, periodLabel, activity, sections, rowsBySection, networks, hasVector, nota }, ref) {
+const DEFAULT_LAYOUT = {
+  t: k => ({
+    title_bar: 'INFORME: CONTENIDOS Y PROGRAMACIÓN', title_actividad: 'ACTIVIDAD', group_creativo: 'Creativo',
+    group_programacion: 'Programación', col_vector: 'Vector', col_creativo: '# Creativo', col_codigo: 'Código',
+    col_enlaces: 'Enlace(s)', col_aprobacion: 'Aprobación', sub_fecha: 'Fecha', sub_posteo: 'Posteo',
+    col_observaciones: 'Observaciones', nota_label: 'Nota importante',
+  }[k] || k),
+  show: () => true,
+  customCreativo: [],
+  customFinal: [],
+}
+
+export const PrintTable = forwardRef(function PrintTable({ client, periodLabel, activity, sections, rowsBySection, networks, hasVector, nota, layout }, ref) {
+  const L = layout || DEFAULT_LAYOUT
   const nNet = networks.length
+  const showVec = hasVector && L.show('col_vector')
+  const creCols = ['col_creativo', 'col_codigo', 'col_enlaces', 'col_aprobacion'].filter(L.show)
+  const CRE_W = { col_creativo: 7, col_codigo: 15, col_enlaces: 7, col_aprobacion: 8 }
+  const showPosteo = L.show('sub_posteo')
+  const showObs = L.show('col_observaciones')
   // Anchos relativos de columna (se ajustan al ancho total)
   const cols = [
     { w: 3.5 }, // banda etapa
-    ...(hasVector ? [{ w: 7 }] : []),
-    { w: 7 }, { w: 15 }, { w: 7 }, { w: 8 },
-    ...networks.flatMap(() => [{ w: 8 }, { w: 7.5 }]),
-    { w: 17 },
+    ...(showVec ? [{ w: 7 }] : []),
+    ...creCols.map(k => ({ w: CRE_W[k] })),
+    ...L.customCreativo.map(() => ({ w: 9 })),
+    ...networks.flatMap(() => (showPosteo ? [{ w: 8 }, { w: 7.5 }] : [{ w: 8 }])),
+    ...L.customFinal.map(() => ({ w: 10 })),
+    ...(showObs ? [{ w: 17 }] : []),
   ]
   const totalW = cols.reduce((a, c) => a + c.w, 0)
 
   return (
     <div ref={ref} className={styles.printWrap}>
       <div data-pdf-block="head">
-        <div className={styles.bar}>INFORME: CONTENIDOS Y PROGRAMACIÓN</div>
+        <div className={styles.bar}>{L.t('title_bar')}</div>
         <div className={styles.idGrid}>
           <div className={styles.idLabel}>CLIENTE:</div>
           <div>{client}</div>
@@ -109,7 +130,7 @@ export const PrintTable = forwardRef(function PrintTable({ client, periodLabel, 
           <div>{periodLabel}</div>
         </div>
         <div className={styles.gap} />
-        <div className={`${styles.bar} ${styles.barSub}`}>ACTIVIDAD</div>
+        <div className={`${styles.bar} ${styles.barSub}`}>{L.t('title_actividad')}</div>
         <div className={styles.actGrid}>
           {activity.map(a => (
             <div key={a.label} className={styles.actCell}>
@@ -127,23 +148,22 @@ export const PrintTable = forwardRef(function PrintTable({ client, periodLabel, 
         <thead>
           <tr>
             <th className={styles.thTeal} rowSpan={3} />
-            {hasVector && <th className={styles.thTeal} rowSpan={3}>Vector</th>}
-            <th className={styles.thCoral} colSpan={4}>Creativo</th>
-            {nNet > 0 && <th className={styles.thTeal} colSpan={nNet * 2}>Programación</th>}
-            <th className={styles.thTeal} rowSpan={3}>Observaciones</th>
+            {showVec && <th className={styles.thTeal} rowSpan={3}>{L.t('col_vector')}</th>}
+            {creCols.length + L.customCreativo.length > 0 && <th className={styles.thCoral} colSpan={creCols.length + L.customCreativo.length}>{L.t('group_creativo')}</th>}
+            {nNet > 0 && <th className={styles.thTeal} colSpan={nNet * (showPosteo ? 2 : 1)}>{L.t('group_programacion')}</th>}
+            {L.customFinal.map(c => <th key={c.id} className={styles.thTeal} rowSpan={3}>{c.label}</th>)}
+            {showObs && <th className={styles.thTeal} rowSpan={3}>{L.t('col_observaciones')}</th>}
           </tr>
           <tr>
-            <th className={styles.thCoralSoft} rowSpan={2}># Creativo</th>
-            <th className={styles.thCoralSoft} rowSpan={2}>Código</th>
-            <th className={styles.thCoralSoft} rowSpan={2}>Enlace(s)</th>
-            <th className={styles.thCoralSoft} rowSpan={2}>Aprobación</th>
-            {networks.map(n => <th key={n.id} className={styles.thNet} colSpan={2}>{n.label}</th>)}
+            {creCols.map(k => <th key={k} className={styles.thCoralSoft} rowSpan={2}>{L.t(k)}</th>)}
+            {L.customCreativo.map(c => <th key={c.id} className={styles.thCoralSoft} rowSpan={2}>{c.label}</th>)}
+            {networks.map(n => <th key={n.id} className={styles.thNet} colSpan={showPosteo ? 2 : 1}>{n.label}</th>)}
           </tr>
           <tr>
             {networks.map(n => (
               <Fragment key={n.id}>
-                <th className={styles.thNetSoft}>Fecha</th>
-                <th className={styles.thNetSoft}>Posteo</th>
+                <th className={styles.thNetSoft}>{L.t('sub_fecha')}</th>
+                {showPosteo && <th className={styles.thNetSoft}>{L.t('sub_posteo')}</th>}
               </Fragment>
             ))}
           </tr>
@@ -163,29 +183,35 @@ export const PrintTable = forwardRef(function PrintTable({ client, periodLabel, 
                         <span className={styles.bandText}>{sec.short}</span>
                       </td>
                     )}
-                    {hasVector && <td>{r.vector}</td>}
-                    <td>{r.creativo}</td>
-                    <td className={styles.bold}>{r.codigo}</td>
-                    <td>
-                      {(r.enlaces || []).map((u, i) => (
-                        <div key={i}><a href={u} data-pdf-link={u} className={styles.plink}>{labels[i]}</a></div>
-                      ))}
-                    </td>
-                    <td>{fmtDMY(r.aprobacion)}</td>
+                    {showVec && <td>{r.vector}</td>}
+                    {L.show('col_creativo') && <td>{r.creativo}</td>}
+                    {L.show('col_codigo') && <td className={styles.bold}>{r.codigo}</td>}
+                    {L.show('col_enlaces') && (
+                      <td>
+                        {(r.enlaces || []).map((u, i) => (
+                          <div key={i}><a href={u} data-pdf-link={u} className={styles.plink}>{labels[i]}</a></div>
+                        ))}
+                      </td>
+                    )}
+                    {L.show('col_aprobacion') && <td>{fmtDMY(r.aprobacion)}</td>}
+                    {L.customCreativo.map(c => <td key={c.id}><CustomPrint c={c} v={r.extra?.[c.id]} /></td>)}
                     {networks.map(n => {
                       const posteo = (r.posteos?.[n.id] || '').trim()
                       return (
                         <Fragment key={n.id}>
                           <td>{fmtDMY(r.pubs?.[n.id])}</td>
-                          <td>
-                            {isUrl(posteo)
-                              ? <a href={posteo} data-pdf-link={posteo} className={styles.plink}>{r.tipo === 'video' ? 'Ver reel' : 'Ver post'}</a>
-                              : posteo}
-                          </td>
+                          {showPosteo && (
+                            <td>
+                              {isUrl(posteo)
+                                ? <a href={posteo} data-pdf-link={posteo} className={styles.plink}>{r.tipo === 'video' ? 'Ver reel' : 'Ver post'}</a>
+                                : posteo}
+                            </td>
+                          )}
                         </Fragment>
                       )
                     })}
-                    <td className={styles.obsCell}>{r.observaciones}</td>
+                    {L.customFinal.map(c => <td key={c.id}><CustomPrint c={c} v={r.extra?.[c.id]} /></td>)}
+                    {showObs && <td className={styles.obsCell}>{r.observaciones}</td>}
                   </tr>
                 )
               })}
@@ -196,10 +222,16 @@ export const PrintTable = forwardRef(function PrintTable({ client, periodLabel, 
 
       {nota && (
         <div data-pdf-block="note" className={styles.noteRow}>
-          <div className={styles.noteHead}>Nota importante</div>
+          <div className={styles.noteHead}>{L.t('nota_label')}</div>
           <div className={styles.noteText}>{nota}</div>
         </div>
       )}
     </div>
   )
 })
+
+function CustomPrint({ c, v }) {
+  if (c.tipo === 'link' && isUrl(v)) return <a href={v} data-pdf-link={v} className={styles.plink}>Ver</a>
+  if (c.tipo === 'check') return v ? '✓' : ''
+  return customValueText(c.tipo, v)
+}
