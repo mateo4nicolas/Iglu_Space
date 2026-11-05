@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMatriz } from '../hooks/useMatriz'
 import { useAuth } from '../context/AuthContext'
 import TaskModal from '../components/tasks/TaskModal'
@@ -55,6 +55,22 @@ export default function MatrizPage() {
   const [showColSettings, setShowColSettings] = useState(false)
   const [mesAno, setMesAno] = useState(currentMesBase())
   const [generatingId, setGeneratingId] = useState(null)
+  // Menú "Generar": posición fija (la tabla tiene scroll y lo recortaría)
+  const [genMenu, setGenMenu] = useState(null) // { id, top, right }
+  const genMenuId = genMenu?.id || null
+  const setGenMenuId = v => { if (v === null) setGenMenu(null) }
+  useEffect(() => {
+    if (!genMenu) return
+    const close = () => setGenMenu(null)
+    window.addEventListener('click', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [genMenu])
   const [showClientPicker, setShowClientPicker] = useState(false)
   const [togglingId, setTogglingId] = useState(null)
 
@@ -68,18 +84,23 @@ export default function MatrizPage() {
     if (error) alert('No se pudo actualizar: ' + (error.message || 'error desconocido'))
   }
 
-  async function handleGenerarProximoMes(client) {
-    const cicloActual = cycleLabel(mesAno, period)
-    const proximoMes = shiftMesBase(mesAno, 1)
-    const cicloProximo = cycleLabel(proximoMes, period)
-    if (!confirm(`¿Generar las tareas del próximo ciclo para "${client.brand_name}"?\n\nCiclo actual: ${cicloActual}\nNuevo ciclo: ${cicloProximo}\n\nSe crearán automáticamente en la Vista Clientes, sin afectar las tareas actuales.`)) return
+  // destino: 'este' = el mes que se está viendo · 'proximo' = el siguiente
+  // (la función genera el mes siguiente al que recibe, tomando ese mes como plantilla
+  //  y sin duplicar entregables que ya existan)
+  async function handleGenerarMes(client, destino) {
+    setGenMenuId(null)
+    const mesDestino = destino === 'este' ? mesAno : shiftMesBase(mesAno, 1)
+    const mesBase = shiftMesBase(mesDestino, -1)
+    const cicloDestino = cycleLabel(mesDestino, period)
+    const txt = destino === 'este' ? 'de este ciclo' : 'del próximo ciclo'
+    if (!confirm(`¿Generar las tareas ${txt} para "${client.brand_name}"?\n\nCiclo a generar: ${cicloDestino}\n\nSolo se crean los entregables que falten; las tareas que ya existen no se tocan.`)) return
     setGeneratingId(client.id)
-    const { data, error } = await generarProximoMes(client.id, mesAno)
+    const { data, error } = await generarProximoMes(client.id, mesBase)
     setGeneratingId(null)
     if (error) {
-      alert('No se pudo generar el próximo mes: ' + (error.message || 'Error desconocido'))
+      alert('No se pudo generar el mes: ' + (error.message || 'Error desconocido'))
     } else {
-      alert(`Se generaron ${data ?? 0} tareas nuevas para ${client.brand_name} (${cicloProximo}).`)
+      alert(data ? `Se generaron ${data} tareas nuevas para ${client.brand_name} (${cicloDestino}).` : `${client.brand_name} ya tenía todas las tareas de ${cicloDestino}.`)
     }
   }
 
@@ -179,13 +200,37 @@ export default function MatrizPage() {
                   })}
                   {isAdmin && (
                     <td className={styles.cell}>
-                      <button
-                        className={styles.closeMonthBtn}
-                        onClick={() => handleGenerarProximoMes(client)}
-                        disabled={generatingId === client.id}
-                      >
-                        {generatingId === client.id ? 'Generando...' : 'Generar Próximo Mes'}
-                      </button>
+                      <div className={styles.genWrap}>
+                        <button
+                          className={styles.closeMonthBtn}
+                          onClick={e => {
+                            e.stopPropagation()
+                            if (genMenuId === client.id) { setGenMenu(null); return }
+                            const r = e.currentTarget.getBoundingClientRect()
+                            const below = window.innerHeight - r.bottom > 120
+                            setGenMenu({ id: client.id, top: below ? r.bottom + 4 : r.top - 4, right: window.innerWidth - r.right, up: !below })
+                          }}
+                          disabled={generatingId === client.id}
+                        >
+                          {generatingId === client.id ? 'Generando...' : 'Generar ▾'}
+                        </button>
+                        {genMenuId === client.id && (
+                          <div
+                            className={styles.genMenu}
+                            style={{ top: genMenu.top, right: genMenu.right, transform: genMenu.up ? 'translateY(-100%)' : undefined }}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <button className={styles.genMenuItem} onClick={() => handleGenerarMes(client, 'este')}>
+                              Este Mes
+                              <span className={styles.genMenuSub}>{cycleLabel(mesAno, period)}</span>
+                            </button>
+                            <button className={styles.genMenuItem} onClick={() => handleGenerarMes(client, 'proximo')}>
+                              Próximo Mes
+                              <span className={styles.genMenuSub}>{cycleLabel(shiftMesBase(mesAno, 1), period)}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
