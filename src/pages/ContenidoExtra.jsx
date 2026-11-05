@@ -5,7 +5,10 @@ import {
   FORMATO_OPTS, SOLICITA_OPTS, APROBACION_OPTS, DISENADO_OPTS,
   PUBLICACION_OPTS, PRESUPUESTO_OPTS, PAUTA_OPTS,
 } from '../hooks/useContenidoExtra'
-import { useContenidoExtraHeaders, HEADER_GROUPS } from '../hooks/useContenidoExtraHeaders'
+import { useContenidoExtraHeaders, DEFAULT_HEADERS } from '../hooks/useContenidoExtraHeaders'
+import { useTablaLayout } from '../hooks/useTablaLayout'
+import TablaLayoutModal from '../components/tablas/TablaLayoutModal'
+import CustomCell, { customValueText } from '../components/tablas/CustomCell'
 import { downloadXlsx } from '../utils/xlsxExport'
 import styles from './ContenidoExtra.module.css'
 
@@ -96,10 +99,71 @@ function CheckCell({ checked, onChange }) {
   )
 }
 
+// ── Modelo de columnas (orden, grupo, cómo se edita y cómo se exporta) ──────
+const fmtDay = v => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || ''))
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+}
+const optLabel = (opts, v) => opts.find(o => o.value === v)?.label || ''
+
+const BASE_COLUMNS = [
+  { key: 'col_cliente', group: 'group_arte_extra', hideable: false, width: 22 },
+  { key: 'col_formato', group: 'group_arte_extra', field: 'formato', opts: FORMATO_OPTS, width: 12 },
+  { key: 'col_solicita', group: 'group_arte_extra', field: 'solicita', opts: SOLICITA_OPTS, width: 11 },
+  { key: 'col_fecha_solicitud', group: 'none_1', field: 'fecha_solicitud', kind: 'date', width: 14 },
+  { key: 'col_codigo', group: 'group_planificacion', field: 'codigo', kind: 'text', placeholder: 'Código', width: 14 },
+  { key: 'col_copy_diseno', group: 'group_planificacion', field: 'copy_diseno', kind: 'textarea', placeholder: 'Copy diseño', wide: true, width: 36 },
+  { key: 'col_copy_red_social', group: 'group_planificacion', field: 'copy_red_social', kind: 'textarea', placeholder: 'Copy red social', wide: true, width: 36 },
+  { key: 'col_aprobacion', group: 'group_planificacion', field: 'aprobacion', opts: APROBACION_OPTS, width: 12 },
+  { key: 'col_fecha_entrega', group: 'group_diseno', field: 'fecha_entrega', kind: 'date', width: 14 },
+  { key: 'col_disenado', group: 'group_diseno', field: 'disenado', opts: DISENADO_OPTS, width: 16 },
+  { key: 'col_link', group: 'group_publicacion', field: 'link', kind: 'link', width: 30 },
+  { key: 'col_publicacion', group: 'group_publicacion', field: 'publicacion', opts: PUBLICACION_OPTS, width: 13 },
+  { key: 'col_publicacion_check', group: 'group_publicacion', field: 'publicacion_check', kind: 'check', exportLabel: 'col_publicacion', width: 12 },
+  { key: 'col_fecha_publicacion', group: 'group_pauta', field: 'fecha_publicacion', kind: 'date', width: 16 },
+  { key: 'col_presupuesto', group: 'group_pauta', field: 'presupuesto', opts: PRESUPUESTO_OPTS, width: 16 },
+  { key: 'col_duracion', group: 'group_pauta', field: 'duracion', kind: 'text', placeholder: 'Duración', width: 12 },
+  { key: 'col_pauta', group: 'none_2', field: 'pauta', opts: PAUTA_OPTS, width: 12 },
+  { key: 'col_pauta_check', group: 'none_2', field: 'verificado', kind: 'check', exportLabel: 'col_pauta', width: 12 },
+]
+const GROUP_ORDER = ['group_arte_extra', 'none_1', 'group_planificacion', 'group_diseno', 'group_publicacion', 'group_pauta', 'none_2', 'final']
+const CUSTOM_GROUPS = [
+  { value: 'group_arte_extra', label: 'En: Arte extra' },
+  { value: 'group_planificacion', label: 'En: Planificación' },
+  { value: 'group_diseno', label: 'En: Diseño' },
+  { value: 'group_publicacion', label: 'En: Publicación' },
+  { value: 'group_pauta', label: 'En: Pauta' },
+  { value: 'final', label: 'Al final (grupo OTROS)' },
+]
+const LAYOUT_SECTIONS = [
+  { title: 'Encabezados de grupo', items: ['group_arte_extra', 'group_planificacion', 'group_diseno', 'group_publicacion', 'group_pauta', 'group_otros'].map(k => ({ key: k, default: k === 'group_otros' ? 'OTROS' : DEFAULT_HEADERS[k] })) },
+  { title: 'Columnas (título y si se ve)', items: BASE_COLUMNS.map(c => ({
+    key: c.key,
+    default: DEFAULT_HEADERS[c.key],
+    placeholder: c.exportLabel ? `${DEFAULT_HEADERS[c.key]}  (check de ${DEFAULT_HEADERS[c.exportLabel].toLowerCase()})` : undefined,
+    hideable: c.hideable !== false,
+  })) },
+]
+
 export default function ContenidoExtraPage() {
   const { isAdmin } = useAuth()
   const { rows, meses, loading, addRow, updateRow, deleteRow, deleteMes, generarNuevoMes } = useContenidoExtra()
-  const { labelFor, saveHeaders } = useContenidoExtraHeaders()
+  const { headers, labelFor: headerLabel, saveHeaders } = useContenidoExtraHeaders()
+  const tabla = useTablaLayout('contenido_extra')
+  const labelFor = key => (key === 'group_otros' ? (headers.group_otros || 'OTROS') : headerLabel(key))
+
+  // Columnas visibles en orden, agrupadas (incluye columnas propias)
+  const visibleCols = []
+  GROUP_ORDER.forEach(g => {
+    BASE_COLUMNS.filter(c => c.group === g && !tabla.isHidden(c.key)).forEach(c => visibleCols.push({ ...c, label: labelFor(c.key) }))
+    tabla.customIn(g).filter(c => !tabla.isHidden(c.id)).forEach(c => visibleCols.push({ key: c.id, group: g === 'final' ? 'group_otros' : g, custom: c, label: c.label, width: 16 }))
+  })
+  const groupRuns = []
+  visibleCols.forEach(c => {
+    const last = groupRuns[groupRuns.length - 1]
+    if (last && last.group === c.group) last.span += 1
+    else groupRuns.push({ group: c.group, span: 1 })
+  })
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [confirmDeleteMes, setConfirmDeleteMes] = useState(null)
   const [activeMes, setActiveMes] = useState(currentMesKey())
@@ -144,25 +208,22 @@ export default function ContenidoExtraPage() {
 
   // Descarga en Excel: todo el mes, o solo lo que se ve cuando hay filtro activo
   function handleDownload() {
-    const optLabel = (opts, v) => opts.find(o => o.value === v)?.label || ''
-    const fmtDay = v => {
-      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || ''))
-      return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+    const headersX = visibleCols.map(c => c.exportLabel ? `${labelFor(c.exportLabel)} (check)` : c.label)
+    const valueOf = (c, r) => {
+      if (c.custom) return customValueText(c.custom.tipo, r.extra?.[c.custom.id])
+      if (c.key === 'col_cliente') return r.cliente
+      if (c.opts) return optLabel(c.opts, r[c.field])
+      if (c.kind === 'date') return fmtDay(r[c.field])
+      if (c.kind === 'check') return r[c.field] ? 'Sí' : ''
+      return r[c.field]
     }
-    const keys = ['cliente', 'formato', 'solicita', 'fecha_solicitud', 'codigo', 'copy_diseno', 'copy_red_social', 'aprobacion', 'fecha_entrega', 'disenado', 'link', 'publicacion', 'publicacion_check', 'fecha_publicacion', 'presupuesto', 'duracion', 'pauta', 'pauta_check']
-    const headers = keys.map(k => k === 'publicacion_check' ? `${labelFor('col_publicacion')} (check)` : k === 'pauta_check' ? `${labelFor('col_pauta')} (check)` : labelFor('col_' + k))
-    const data = rowsForMes.map(r => [
-      r.cliente, optLabel(FORMATO_OPTS, r.formato), optLabel(SOLICITA_OPTS, r.solicita), fmtDay(r.fecha_solicitud),
-      r.codigo, r.copy_diseno, r.copy_red_social, optLabel(APROBACION_OPTS, r.aprobacion), fmtDay(r.fecha_entrega),
-      optLabel(DISENADO_OPTS, r.disenado), r.link, optLabel(PUBLICACION_OPTS, r.publicacion), r.publicacion_check ? 'Sí' : '',
-      fmtDay(r.fecha_publicacion), optLabel(PRESUPUESTO_OPTS, r.presupuesto), r.duracion, optLabel(PAUTA_OPTS, r.pauta), r.verificado ? 'Sí' : '',
-    ])
+    const data = rowsForMes.map(r => visibleCols.map(c => valueOf(c, r)))
     const sufijo = filtering ? '-filtrado' : ''
     downloadXlsx(`contenido-extra-${activeMes}${sufijo}.xlsx`, {
       sheetName: mesKeyToLabel(activeMes),
-      headers,
+      headers: headersX,
       rows: data,
-      widths: [22, 12, 11, 14, 14, 36, 36, 12, 14, 16, 30, 13, 12, 16, 16, 12, 12, 12],
+      widths: visibleCols.map(c => c.width || 14),
     })
   }
 
@@ -202,7 +263,7 @@ export default function ContenidoExtraPage() {
         <button className="btn btn-primary" onClick={() => addRow(activeMes, { formato: fTipo || null, cliente: fCliente || '' })}>+ Nueva fila</button>
         {isAdmin && (
           <button className={styles.editHeadersBtn} onClick={() => setShowEditHeaders(true)}>
-            ✏️ Editar títulos
+            ✏️ Editar tabla
           </button>
         )}
       </div>
@@ -255,75 +316,70 @@ export default function ContenidoExtraPage() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th className={styles.groupHeader} colSpan={3}>{labelFor('group_arte_extra')}</th>
-              <th className={styles.groupHeader}></th>
-              <th className={styles.groupHeader} colSpan={4}>{labelFor('group_planificacion')}</th>
-              <th className={styles.groupHeader} colSpan={2}>{labelFor('group_diseno')}</th>
-              <th className={styles.groupHeader} colSpan={3}>{labelFor('group_publicacion')}</th>
-              <th className={styles.groupHeader} colSpan={3}>{labelFor('group_pauta')}</th>
-              <th className={styles.groupHeader}></th>
+              {groupRuns.map((g, i) => (
+                <th key={i} className={styles.groupHeader} colSpan={g.span}>
+                  {g.group.startsWith('none') ? '' : labelFor(g.group)}
+                </th>
+              ))}
             </tr>
             <tr>
-              <th className={`${styles.colHeader} ${styles.stickyColHead}`}>{labelFor('col_cliente')}</th>
-              <th className={styles.colHeader}>{labelFor('col_formato')}</th>
-              <th className={styles.colHeader}>{labelFor('col_solicita')}</th>
-              <th className={styles.colHeader}>{labelFor('col_fecha_solicitud')}</th>
-              <th className={styles.colHeader}>{labelFor('col_codigo')}</th>
-              <th className={styles.colHeader}>{labelFor('col_copy_diseno')}</th>
-              <th className={styles.colHeader}>{labelFor('col_copy_red_social')}</th>
-              <th className={styles.colHeader}>{labelFor('col_aprobacion')}</th>
-              <th className={styles.colHeader}>{labelFor('col_fecha_entrega')}</th>
-              <th className={styles.colHeader}>{labelFor('col_disenado')}</th>
-              <th className={styles.colHeader}>{labelFor('col_link')}</th>
-              <th className={styles.colHeader}>{labelFor('col_publicacion')}</th>
-              <th className={styles.colHeader}>{labelFor('col_publicacion_check')}</th>
-              <th className={styles.colHeader}>{labelFor('col_fecha_publicacion')}</th>
-              <th className={styles.colHeader}>{labelFor('col_presupuesto')}</th>
-              <th className={styles.colHeader}>{labelFor('col_duracion')}</th>
-              <th className={styles.colHeader}>{labelFor('col_pauta')}</th>
-              <th className={styles.colHeader}>{labelFor('col_pauta_check')}</th>
+              {visibleCols.map(c => (
+                <th key={c.key} className={`${styles.colHeader} ${c.key === 'col_cliente' ? styles.stickyColHead : ''}`}>{c.label}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {rowsForMes.length === 0 && (
-              <tr><td className={styles.emptyRow} colSpan={18}>{filtering ? 'Ninguna fila coincide con el filtro.' : 'No hay filas todavía en este mes. Usa "+ Nueva fila" para empezar.'}</td></tr>
+              <tr><td className={styles.emptyRow} colSpan={visibleCols.length}>{filtering ? 'Ninguna fila coincide con el filtro.' : 'No hay filas todavía en este mes. Usa "+ Nueva fila" para empezar.'}</td></tr>
             )}
             {rowsForMes.map(row => (
               <tr key={row.id} className={styles.row}>
-                <td className={`${styles.cell} ${styles.stickyCol}`}>
-                  <div className={styles.clientCellWrap}>
-                    <TextCell value={row.cliente} placeholder="Cliente" onChange={patch(row.id, 'cliente')} />
-                    <button className={styles.deleteBtn} title="Eliminar fila" onClick={() => handleDelete(row.id)}>
-                      {confirmDeleteId === row.id ? '✓' : <TrashIcon />}
-                    </button>
-                  </div>
-                </td>
-                <td className={styles.cell}><SelectCell value={row.formato} options={FORMATO_OPTS} onChange={patch(row.id, 'formato')} /></td>
-                <td className={styles.cell}><SelectCell value={row.solicita} options={SOLICITA_OPTS} onChange={patch(row.id, 'solicita')} /></td>
-                <td className={styles.cell}><DateCell value={row.fecha_solicitud} onChange={patch(row.id, 'fecha_solicitud')} /></td>
-                <td className={styles.cell}><TextCell value={row.codigo} placeholder="Código" onChange={patch(row.id, 'codigo')} /></td>
-                <td className={styles.cellWide}><TextCell value={row.copy_diseno} placeholder="Copy diseño" multiline onChange={patch(row.id, 'copy_diseno')} /></td>
-                <td className={styles.cellWide}><TextCell value={row.copy_red_social} placeholder="Copy red social" multiline onChange={patch(row.id, 'copy_red_social')} /></td>
-                <td className={styles.cell}><SelectCell value={row.aprobacion} options={APROBACION_OPTS} onChange={patch(row.id, 'aprobacion')} /></td>
-                <td className={styles.cell}><DateCell value={row.fecha_entrega} onChange={patch(row.id, 'fecha_entrega')} /></td>
-                <td className={styles.cell}><SelectCell value={row.disenado} options={DISENADO_OPTS} onChange={patch(row.id, 'disenado')} /></td>
-                <td className={styles.cell}>
-                  {row.link ? (
-                    <div className={styles.linkCellWrap}>
-                      <a className={styles.linkChip} href={row.link} target="_blank" rel="noreferrer" title={row.link}>🔗 Extras</a>
-                      <TextCell value={row.link} placeholder="URL" onChange={patch(row.id, 'link')} />
-                    </div>
-                  ) : (
-                    <TextCell value={row.link} placeholder="Pegar link" onChange={patch(row.id, 'link')} />
-                  )}
-                </td>
-                <td className={styles.cell}><SelectCell value={row.publicacion} options={PUBLICACION_OPTS} onChange={patch(row.id, 'publicacion')} /></td>
-                <td className={styles.cellCheck}><CheckCell checked={row.publicacion_check} onChange={patch(row.id, 'publicacion_check')} /></td>
-                <td className={styles.cell}><DateCell value={row.fecha_publicacion} onChange={patch(row.id, 'fecha_publicacion')} /></td>
-                <td className={styles.cell}><SelectCell value={row.presupuesto} options={PRESUPUESTO_OPTS} onChange={patch(row.id, 'presupuesto')} /></td>
-                <td className={styles.cell}><TextCell value={row.duracion} placeholder="Duración" onChange={patch(row.id, 'duracion')} /></td>
-                <td className={styles.cell}><SelectCell value={row.pauta} options={PAUTA_OPTS} onChange={patch(row.id, 'pauta')} /></td>
-                <td className={styles.cellCheck}><CheckCell checked={row.verificado} onChange={patch(row.id, 'verificado')} /></td>
+                {visibleCols.map(c => {
+                  if (c.key === 'col_cliente') {
+                    return (
+                      <td key={c.key} className={`${styles.cell} ${styles.stickyCol}`}>
+                        <div className={styles.clientCellWrap}>
+                          <TextCell value={row.cliente} placeholder="Cliente" onChange={patch(row.id, 'cliente')} />
+                          <button className={styles.deleteBtn} title="Eliminar fila" onClick={() => handleDelete(row.id)}>
+                            {confirmDeleteId === row.id ? '✓' : <TrashIcon />}
+                          </button>
+                        </div>
+                      </td>
+                    )
+                  }
+                  if (c.custom) {
+                    return (
+                      <td key={c.key} className={c.custom.tipo === 'check' ? styles.cellCheck : styles.cell}>
+                        <CustomCell
+                          tipo={c.custom.tipo}
+                          value={row.extra?.[c.custom.id]}
+                          inputClassName={styles.cellInput}
+                          checkClassName={styles.checkbox}
+                          onCommit={v => updateRow(row.id, { extra: { ...(row.extra || {}), [c.custom.id]: v } })}
+                        />
+                      </td>
+                    )
+                  }
+                  if (c.opts) return <td key={c.key} className={styles.cell}><SelectCell value={row[c.field]} options={c.opts} onChange={patch(row.id, c.field)} /></td>
+                  if (c.kind === 'date') return <td key={c.key} className={styles.cell}><DateCell value={row[c.field]} onChange={patch(row.id, c.field)} /></td>
+                  if (c.kind === 'check') return <td key={c.key} className={styles.cellCheck}><CheckCell checked={row[c.field]} onChange={patch(row.id, c.field)} /></td>
+                  if (c.kind === 'textarea') return <td key={c.key} className={styles.cellWide}><TextCell value={row[c.field]} placeholder={c.placeholder} multiline onChange={patch(row.id, c.field)} /></td>
+                  if (c.kind === 'link') {
+                    return (
+                      <td key={c.key} className={styles.cell}>
+                        {row.link ? (
+                          <div className={styles.linkCellWrap}>
+                            <a className={styles.linkChip} href={row.link} target="_blank" rel="noreferrer" title={row.link}>🔗 Extras</a>
+                            <TextCell value={row.link} placeholder="URL" onChange={patch(row.id, 'link')} />
+                          </div>
+                        ) : (
+                          <TextCell value={row.link} placeholder="Pegar link" onChange={patch(row.id, 'link')} />
+                        )}
+                      </td>
+                    )
+                  }
+                  return <td key={c.key} className={styles.cell}><TextCell value={row[c.field]} placeholder={c.placeholder} onChange={patch(row.id, c.field)} /></td>
+                })}
               </tr>
             ))}
           </tbody>
@@ -331,63 +387,17 @@ export default function ContenidoExtraPage() {
       </div>
 
       {showEditHeaders && (
-        <EditHeadersModal labelFor={labelFor} onSave={saveHeaders} onClose={() => setShowEditHeaders(false)} />
+        <TablaLayoutModal
+          title="Editar tabla · Contenido Extra"
+          sections={LAYOUT_SECTIONS}
+          customGroups={CUSTOM_GROUPS}
+          layout={tabla.layout}
+          labelsOverride={Object.fromEntries(LAYOUT_SECTIONS.flatMap(sec => sec.items.map(it => [it.key, headers[it.key] ?? ''])))}
+          onSaveLabels={saveHeaders}
+          onSave={tabla.saveLayout}
+          onClose={() => setShowEditHeaders(false)}
+        />
       )}
-    </div>
-  )
-}
-
-function EditHeadersModal({ labelFor, onSave, onClose }) {
-  const [draft, setDraft] = useState(() => {
-    const all = {}
-    for (const group of HEADER_GROUPS) for (const key of group.keys) all[key] = labelFor(key)
-    return all
-  })
-  const [saving, setSaving] = useState(false)
-
-  async function handleSave() {
-    setSaving(true)
-    const changes = {}
-    for (const group of HEADER_GROUPS) {
-      for (const key of group.keys) {
-        if (draft[key] !== labelFor(key)) changes[key] = draft[key]
-      }
-    }
-    const { error } = await onSave(changes)
-    setSaving(false)
-    if (error) alert('No se pudo guardar: ' + (error.message || 'error desconocido'))
-    else onClose()
-  }
-
-  return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.editHeadersModal} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2>Editar títulos de la tabla</h2>
-          <button className={styles.closeBtn} onClick={onClose}><CloseIcon /></button>
-        </div>
-        <div className={styles.modalForm}>
-          {HEADER_GROUPS.map(group => (
-            <div key={group.title}>
-              <p className={styles.headerGroupTitle}>{group.title}</p>
-              <div className={styles.headerFieldsGrid}>
-                {group.keys.map(key => (
-                  <input
-                    key={key}
-                    className={styles.cellInput}
-                    style={{ border: '1px solid var(--border)', padding: '7px 8px' }}
-                    value={draft[key]}
-                    onChange={e => setDraft(prev => ({ ...prev, [key]: e.target.value }))}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-          <button className="btn btn-primary" style={{ justifyContent: 'center' }} onClick={handleSave} disabled={saving}>
-            {saving ? 'Guardando...' : 'Guardar cambios'}
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

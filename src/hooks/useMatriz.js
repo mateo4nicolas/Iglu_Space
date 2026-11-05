@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { notifyTasksChanged, useTasksChanged } from '../utils/taskEvents'
 
 const TASK_SELECT = `
   id, title, description, links, status, priority, approved, is_finished,
   cliente_id, periodo, columna_matriz, column_id, department_id, mes_tarea,
   assigned_to, created_by, created_at, updated_at,
   allow_transfer, transfer_to_dept_ids,
+  is_shared, shared_with, shared_progress,
   profiles!tasks_assigned_to_fkey(id, full_name, display_name, username),
   kanban_columns(id, title, color, owner_role),
   departments(id, name, color),
@@ -66,6 +68,8 @@ export function useMatriz() {
     return () => supabase.removeChannel(channel)
   }, [fetchAll])
 
+  useTasksChanged(fetchAll)
+
   const activeMatrizColumns = matrizColumns.filter(c => c.is_active)
 
   // Tarea más reciente para un cliente + entregable + mes dado
@@ -80,7 +84,11 @@ export function useMatriz() {
   // ── Pausar/reactivar un cliente en la Matriz, por mes, sin borrar historial ──
   function isClientActiveInMonth(clientId, mes) {
     const entries = clientVisibility.filter(v => v.cliente_id === clientId && v.mes <= mes)
-    if (entries.length === 0) return true // sin registro -> activo por defecto
+    if (entries.length === 0) {
+      // sin registro -> activo solo desde el ciclo en que se añadió el cliente
+      const mesInicio = clients.find(c => c.id === clientId)?.mes_inicio
+      return !mesInicio || mes >= mesInicio
+    }
     const latest = entries[entries.length - 1] // vienen ordenadas por mes asc desde fetchAll
     return latest.active
   }
@@ -108,7 +116,12 @@ export function useMatriz() {
       .from('tasks')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-    if (!error) fetchAll()
+    if (error) {
+      console.error('updateTask error:', error)
+    } else {
+      await fetchAll()
+      notifyTasksChanged()
+    }
     return { error }
   }
 
@@ -118,6 +131,7 @@ export function useMatriz() {
 
   async function deleteTask(id) {
     const { error } = await supabase.from('tasks').delete().eq('id', id)
+    if (!error) notifyTasksChanged()
     if (!error) fetchAll()
     return { error }
   }

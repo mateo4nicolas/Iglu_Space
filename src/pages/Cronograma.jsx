@@ -11,6 +11,8 @@ import { supabase } from '../lib/supabase'
 import TaskModal from '../components/tasks/TaskModal'
 import { cycleLabel } from '../utils/cycleLabel'
 import styles from './Cronograma.module.css'
+import { notifyTasksChanged } from '../utils/taskEvents'
+import ObservationsList from '../components/schedule/ObservationsList'
 import MetaProgressBar from '../components/ui/MetaProgressBar'
 
 export default function CronogramaPage() {
@@ -37,6 +39,9 @@ export default function CronogramaPage() {
     toggleDone,
     adminSetDone,
     updateObservation,
+    addObservation,
+    editObservation,
+    deleteObservation,
     deleteItem,
     linkTask,
     completeNativeItem,
@@ -62,8 +67,13 @@ export default function CronogramaPage() {
   }
 
   async function updateOpenTask(id, updates) {
-    await supabase.from('tasks').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
-    refetch()
+    const { error } = await supabase.from('tasks').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (!error) {
+      refetch()
+      notifyTasksChanged()
+      setOpenTask(null)
+    }
+    return { error }
   }
   async function approveOpenTask(id, approved) {
     await updateOpenTask(id, { approved })
@@ -177,9 +187,9 @@ export default function CronogramaPage() {
           {loading ? (
             <p className={styles.loading}>Cargando...</p>
           ) : isAdmin ? (
-            <AdminView itemsByUser={filteredItemsByUser} onToggle={toggleDone} onDelete={deleteItem} onEdit={setEditingItem} onSaveObs={updateObservation} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} adminSetDone={adminSetDone} onCompleteNative={completeNativeItem} onOpenTask={handleOpenTask} />
+            <AdminView itemsByUser={filteredItemsByUser} onToggle={toggleDone} onDelete={deleteItem} onEdit={setEditingItem} obsHandlers={{ onAdd: addObservation, onEdit: editObservation, onDelete: deleteObservation }} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} adminSetDone={adminSetDone} onCompleteNative={completeNativeItem} onOpenTask={handleOpenTask} />
           ) : (
-            <UserView items={filteredItems} onToggle={toggleDone} onSaveObs={updateObservation} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} onCompleteNative={completeNativeItem} onOpenTask={handleOpenTask} />
+            <UserView items={filteredItems} onToggle={toggleDone} obsHandlers={{ onAdd: addObservation, onEdit: editObservation, onDelete: deleteObservation }} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} onCompleteNative={completeNativeItem} onOpenTask={handleOpenTask} />
           )}
         </>
       ) : (
@@ -326,7 +336,7 @@ function MonthView({ calMonth, setCalMonth, onSelectDate }) {
   )
 }
 
-function AdminView({ itemsByUser, onToggle, onDelete, onEdit, onSaveObs, isDoneByUser, isDoneByAll, adminSetDone, onCompleteNative, onOpenTask }) {
+function AdminView({ itemsByUser, onToggle, onDelete, onEdit, obsHandlers, isDoneByUser, isDoneByAll, adminSetDone, onCompleteNative, onOpenTask }) {
   const entries = Object.entries(itemsByUser)
   if (entries.length === 0) return <EmptyState isAdmin />
   return (
@@ -346,7 +356,7 @@ function AdminView({ itemsByUser, onToggle, onDelete, onEdit, onSaveObs, isDoneB
           </div>
           <div className={styles.itemList}>
             {items.map(item => (
-              <PendienteItem key={item.id} item={item} isAdmin onToggle={onToggle} onDelete={onDelete} onEdit={onEdit} onSaveObs={onSaveObs} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} uid={assignee?.id} onCompleteNative={onCompleteNative} onOpenTask={onOpenTask} />
+              <PendienteItem key={item.id} item={item} isAdmin onToggle={onToggle} onDelete={onDelete} onEdit={onEdit} obsHandlers={obsHandlers} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} uid={assignee?.id} onCompleteNative={onCompleteNative} onOpenTask={onOpenTask} />
             ))}
           </div>
         </div>
@@ -355,21 +365,19 @@ function AdminView({ itemsByUser, onToggle, onDelete, onEdit, onSaveObs, isDoneB
   )
 }
 
-function UserView({ items, onToggle, onSaveObs, isDoneByUser, isDoneByAll, onCompleteNative, onOpenTask }) {
+function UserView({ items, onToggle, obsHandlers, isDoneByUser, isDoneByAll, onCompleteNative, onOpenTask }) {
   if (items.length === 0) return <EmptyState />
   return (
     <div className={styles.itemList} style={{ maxWidth: 700 }}>
       {items.map(item => (
-        <PendienteItem key={item.id} item={item} isAdmin={false} onToggle={onToggle} onSaveObs={onSaveObs} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} onCompleteNative={onCompleteNative} onOpenTask={onOpenTask} />
+        <PendienteItem key={item.id} item={item} isAdmin={false} onToggle={onToggle} obsHandlers={obsHandlers} isDoneByUser={isDoneByUser} isDoneByAll={isDoneByAll} onCompleteNative={onCompleteNative} onOpenTask={onOpenTask} />
       ))}
     </div>
   )
 }
 
-function PendienteItem({ item, isAdmin, onToggle, onDelete, onEdit, onSaveObs, isDoneByUser, isDoneByAll, uid, onCompleteNative, onOpenTask }) {
+function PendienteItem({ item, isAdmin, onToggle, onDelete, onEdit, obsHandlers, isDoneByUser, isDoneByAll, uid, onCompleteNative, onOpenTask }) {
   const { profile } = useAuth()
-  const [showObs, setShowObs] = useState(false)
-  const [obsText, setObsText] = useState(item.user_observation || '')
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const [menuPos, setMenuPos] = useState(null)
   const [deptColumns, setDeptColumns] = useState([])
@@ -390,11 +398,6 @@ function PendienteItem({ item, isAdmin, onToggle, onDelete, onEdit, onSaveObs, i
     document.addEventListener('mousedown', handleOutside)
     return () => document.removeEventListener('mousedown', handleOutside)
   }, [showStatusMenu])
-
-  async function saveObs() {
-    await onSaveObs(item.id, obsText)
-    setShowObs(false)
-  }
 
   async function handleCheckClick(e) {
     e.stopPropagation()
@@ -481,22 +484,7 @@ function PendienteItem({ item, isAdmin, onToggle, onDelete, onEdit, onSaveObs, i
         </div>
         {item.notes && <p className={styles.itemNotes}>{item.notes}</p>}
 
-        {showObs ? (
-          <div className={styles.obsBox}>
-            <textarea className={styles.obsInput} value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Escribe tu observación..." rows={2} />
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button className="btn btn-primary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={saveObs}>Guardar</button>
-              <button className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setShowObs(false)}>Cancelar</button>
-            </div>
-          </div>
-        ) : (
-          <div className={styles.obsRow}>
-            {item.user_observation && <p className={styles.obsText}>📝 {item.user_observation}</p>}
-            <button className={styles.obsBtn} onClick={() => setShowObs(true)}>
-              {item.user_observation ? 'Editar observación' : '+ Añadir observación'}
-            </button>
-          </div>
-        )}
+        <ObservationsList item={item} {...(obsHandlers || {})} />
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, flexDirection: 'column' }}>
         {multiAssign && (

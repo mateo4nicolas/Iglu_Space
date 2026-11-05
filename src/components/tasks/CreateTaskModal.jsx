@@ -3,6 +3,13 @@ import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import styles from './CreateTaskModal.module.css'
 
+function todayStr(date = new Date()) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 function currentMesTarea(date = new Date()) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -13,6 +20,7 @@ export default function CreateTaskModal({ columns, departmentId, onClose, onCrea
   const { profile, isAdmin } = useAuth()
   const [profiles, setProfiles] = useState([])
   const [departments, setDepartments] = useState([])
+  const [deptMembers, setDeptMembers] = useState([])
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -20,13 +28,29 @@ export default function CreateTaskModal({ columns, departmentId, onClose, onCrea
     assigned_to: '',
     column_id: columns[0]?.id || '',
     mes_tarea: currentMesTarea(),
+    is_shared: false,
+    shared_with: [],
+    fecha_cronograma: todayStr(),
   })
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     supabase.from('profiles').select('id, full_name, display_name, username').then(({ data }) => setProfiles(data || []))
     supabase.from('departments').select('id, name, color').order('name').then(({ data }) => setDepartments(data || []))
-  }, [])
+    if (departmentId) {
+      supabase.from('profile_departments')
+        .select('user_id, profiles(id, full_name, display_name, username)')
+        .eq('department_id', departmentId)
+        .then(({ data }) => setDeptMembers((data || []).map(r => r.profiles).filter(Boolean)))
+    }
+  }, [departmentId])
+
+  function toggleShared(id) {
+    setForm(p => ({
+      ...p,
+      shared_with: p.shared_with.includes(id) ? p.shared_with.filter(x => x !== id) : [...p.shared_with, id],
+    }))
+  }
 
   function set(key, val) { setForm(p => ({ ...p, [key]: val })) }
 
@@ -34,6 +58,7 @@ export default function CreateTaskModal({ columns, departmentId, onClose, onCrea
     e.preventDefault()
     if (!form.title.trim() || !form.mes_tarea) return
     setLoading(true)
+    const sharedWith = form.is_shared ? form.shared_with.filter(id => id !== form.assigned_to) : []
     const { error } = await onCreate({
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -42,6 +67,11 @@ export default function CreateTaskModal({ columns, departmentId, onClose, onCrea
       column_id: form.column_id || columns[0]?.id,
       mes_tarea: form.mes_tarea,
       allow_transfer: true,
+      is_shared: sharedWith.length > 0,
+      shared_with: sharedWith,
+      ...((form.assigned_to || sharedWith.length > 0) && form.fecha_cronograma
+        ? { fecha_cronograma: form.fecha_cronograma }
+        : {}),
     })
     setLoading(false)
     if (!error) onClose()
@@ -99,6 +129,62 @@ export default function CreateTaskModal({ columns, departmentId, onClose, onCrea
                 {profiles.map(p => <option key={p.id} value={p.id}>{nameFor(p)}</option>)}
               </select>
             </Field>
+          )}
+
+          {isAdmin && (form.assigned_to || (form.is_shared && form.shared_with.length > 0)) && (
+            <Field label="Fecha en el cronograma">
+              <input
+                type="date"
+                className={styles.input}
+                value={form.fecha_cronograma}
+                onChange={e => set('fecha_cronograma', e.target.value)}
+                required
+              />
+            </Field>
+          )}
+
+          {isAdmin && (
+            <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, background: 'var(--bg-hover)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+                <input
+                  type="checkbox"
+                  checked={form.is_shared}
+                  onChange={e => set('is_shared', e.target.checked)}
+                  style={{ accentColor: 'var(--accent)', width: 14, height: 14 }}
+                />
+                Tarea compartida
+              </label>
+              {form.is_shared && (
+                <>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '6px 0' }}>
+                    Elige con quién se comparte. Llega a revisión solo cuando todos la manden.
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {(deptMembers.length > 0 ? deptMembers : profiles)
+                      .filter(p => p.id !== form.assigned_to)
+                      .map(p => {
+                        const sel = form.shared_with.includes(p.id)
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => toggleShared(p.id)}
+                            style={{
+                              padding: '5px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
+                              border: `1.5px solid ${sel ? 'var(--accent)' : 'var(--border)'}`,
+                              background: sel ? 'var(--accent-dim)' : 'var(--bg-card)',
+                              color: sel ? 'var(--accent)' : 'var(--text-secondary)',
+                              fontWeight: sel ? 600 : 400,
+                            }}
+                          >
+                            {nameFor(p)}{sel ? ' ✓' : ''}
+                          </button>
+                        )
+                      })}
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           <div className={styles.footer}>

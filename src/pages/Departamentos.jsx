@@ -8,6 +8,8 @@ import TaskModal from '../components/tasks/TaskModal'
 import CreateTaskModal from '../components/tasks/CreateTaskModal'
 import ColumnSettings from '../components/tasks/ColumnSettings'
 import { cycleLabel, currentMesBase } from '../utils/cycleLabel'
+import { sharedSentCount } from '../utils/sharedTask'
+import NewClientBadge from '../components/ui/NewClientBadge'
 import styles from './Departamentos.module.css'
 
 export default function DepartamentosPage() {
@@ -212,13 +214,14 @@ const CLIENT_PERIODS = [
 ]
 
 function ClientesBoard({ isAdmin }) {
-  const { clientsByPeriod, tasks, columnsForDept, updateTask, deleteTask, loading } = useMatriz()
+  const { clientsByPeriod, isClientActiveInMonth, tasks, columnsForDept, updateTask, deleteTask, loading } = useMatriz()
   const [period, setPeriod] = useState(CLIENT_PERIODS[0].value)
   const [mesTarea, setMesTarea] = useState(currentMesBase())
   const [selectedTask, setSelectedTask] = useState(null)
   const [collapsed, setCollapsed] = useState({})
 
-  const clientsInPeriod = clientsByPeriod(period)
+  const clientsForMonth = p => clientsByPeriod(p).filter(c => isClientActiveInMonth(c.id, mesTarea))
+  const clientsInPeriod = clientsForMonth(period)
 
   function tasksForClient(clientId) {
     return tasks.filter(t => t.cliente_id === clientId && t.approved !== false && t.mes_tarea === mesTarea)
@@ -272,7 +275,7 @@ function ClientesBoard({ isAdmin }) {
             onClick={() => setPeriod(p.value)}
           >
             {p.label}
-            <span className={styles.deptCount}>{clientsByPeriod(p.value).length}</span>
+            <span className={styles.deptCount}>{clientsForMonth(p.value).length}</span>
           </button>
         ))}
       </div>
@@ -296,6 +299,7 @@ function ClientesBoard({ isAdmin }) {
                   </button>
                   <div className={styles.colDot} style={{ background: 'var(--accent)' }} />
                   <span className={styles.colTitle}>{client.brand_name}</span>
+                  <NewClientBadge client={client} mes={mesTarea} />
                   <span className={styles.colCount}>{clientTasks.length}</span>
                 </div>
                 {!isCollapsed && (
@@ -324,7 +328,7 @@ function ClientesBoard({ isAdmin }) {
           task={selectedTask}
           columns={columnsForDept(selectedTask.department_id)}
           onClose={() => setSelectedTask(null)}
-          onUpdate={async (id, data) => { await updateTask(id, data); setSelectedTask(null) }}
+          onUpdate={async (id, data) => { const r = await updateTask(id, data); if (!r?.error) setSelectedTask(null); return r }}
           onApprove={async (id, approved) => { await updateTask(id, { approved }); setSelectedTask(null) }}
           onDelete={async (id) => { await deleteTask(id); setSelectedTask(null) }}
         />
@@ -415,7 +419,7 @@ function DeptKanban({ departmentId, isAdmin }) {
           task={selectedTask}
           columns={columns}
           onClose={() => setSelectedTask(null)}
-          onUpdate={async (id, data) => { await updateTask(id, data); setSelectedTask(null) }}
+          onUpdate={async (id, data) => { const r = await updateTask(id, data); if (!r?.error) setSelectedTask(null); return r }}
           onApprove={async (id, approved) => {
             await updateTask(id, { approved, column_id: approved ? columns[0]?.id : null })
             setSelectedTask(null)
@@ -501,6 +505,14 @@ function TaskCard({ task, isAdmin, onClick, getOppositeColumns, onMove }) {
         <p className={styles.cardTitle}>{task.title}</p>
         {task.description && <p className={styles.cardDesc}>{task.description}</p>}
         {task.allow_transfer && !task.is_finished && <span style={{ fontSize: 9, color: 'var(--info)', marginTop: 2, display: 'block' }}>🔀 Transferible</span>}
+        {task.is_shared && (() => {
+          const { sent, total } = sharedSentCount(task)
+          return (
+            <span style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2, display: 'block', fontWeight: 600 }}>
+              👥 Compartida · {sent}/{total} enviadas
+            </span>
+          )
+        })()}
         <div className={styles.cardFooter}>
           {assigneeName && <div className={styles.cardAvatar} title={assigneeName}>{assigneeName[0].toUpperCase()}</div>}
           <div

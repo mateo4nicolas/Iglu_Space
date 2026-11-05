@@ -5,6 +5,7 @@ import { useSchedule } from '../hooks/useSchedule'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import styles from './Dashboard.module.css'
+import ObservationsList from '../components/schedule/ObservationsList'
 import MetaProgressBar from '../components/ui/MetaProgressBar'
 
 export default function Dashboard() {
@@ -16,14 +17,14 @@ export default function Dashboard() {
     itemsByUser,
     loading: schedLoading,
     toggleDone,
-    updateObservation,
+    addObservation,
+    editObservation,
+    deleteObservation,
     isDoneByUser,
     isDoneByAll,
   } = useSchedule(today)
 
   const [stats, setStats] = useState({ pending: 0, inProgress: 0, done: 0 })
-  const [showObsFor, setShowObsFor] = useState(null)
-  const [obsText, setObsText] = useState('')
 
   const dateLabel = format(today, "EEEE d 'de' MMMM", { locale: es })
   const displayName = profile?.username || profile?.display_name || profile?.full_name || ''
@@ -42,16 +43,6 @@ export default function Dashboard() {
         done: data.filter(t => t.status === 'done').length,
       })
     }
-  }
-
-  function openObs(item) {
-    setShowObsFor(item.id)
-    setObsText(item.user_observation || '')
-  }
-
-  async function saveObs(id) {
-    await updateObservation(id, obsText)
-    setShowObsFor(null)
   }
 
   const todayItems = isAdmin ? myItems : items
@@ -131,24 +122,7 @@ export default function Dashboard() {
                         ))}
                       </div>
                     )}
-                    {showObsFor === item.id ? (
-                      <div className={styles.obsBox}>
-                        <textarea className={styles.obsInput} placeholder="Escribe tu observación..." value={obsText} onChange={e => setObsText(e.target.value)} rows={2} />
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn btn-primary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => saveObs(item.id)}>Guardar</button>
-                          <button className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setShowObsFor(null)}>Cancelar</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className={styles.obsRow}>
-                        {item.user_observation && <p className={styles.obsPreview}>📝 {item.user_observation}</p>}
-                        {!isAdmin && (
-                          <button className={styles.obsBtn} onClick={() => openObs(item)}>
-                            {item.user_observation ? 'Editar observación' : '+ Añadir observación'}
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    <ObservationsList item={item} onAdd={addObservation} onEdit={editObservation} onDelete={deleteObservation} />
                   </div>
                   {allDone
                     ? <span className="badge badge-success">Listo</span>
@@ -192,7 +166,7 @@ export default function Dashboard() {
                           {userDone && <CheckIcon />}
                         </span>
                         <span className={styles.itemTitle}>{item.title}</span>
-                        {item.user_observation && <span style={{ marginLeft: 'auto', fontSize: 11 }}>📝</span>}
+                        {(item.observations_view || []).length > 0 && <span style={{ marginLeft: 'auto', fontSize: 11 }}>📝 {(item.observations_view || []).length}</span>}
                         {allDone
                           ? <span className="badge badge-success" style={{ fontSize: 10 }}>Listo</span>
                           : userDone

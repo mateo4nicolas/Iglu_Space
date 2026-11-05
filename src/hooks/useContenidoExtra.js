@@ -79,7 +79,7 @@ export function useContenidoExtra() {
   const fetchAll = useCallback(async () => {
     const [{ data: rowsData, error }, { data: mesesData }] = await Promise.all([
       supabase.from('contenido_extra').select('*').order('position', { ascending: true }).order('created_at', { ascending: true }),
-      supabase.from('contenido_extra_meses').select('*').order('position', { ascending: true }).order('mes', { ascending: true }),
+      supabase.from('contenido_extra_meses').select('*').order('mes', { ascending: true }),
     ])
     if (error) {
       console.error('fetchContenidoExtra error:', error)
@@ -115,9 +115,18 @@ export function useContenidoExtra() {
 
   // Genera el siguiente mes a partir del último mes existente (o del mes actual si no hay ninguno)
   async function generarNuevoMes() {
-    const ultimoMes = meses.reduce((max, m) => (m.mes > max ? m.mes : max), currentMesKey())
-    const nuevoMes = nextMesKey(ultimoMes)
-    if (meses.some(m => m.mes === nuevoMes)) return { mes: nuevoMes, error: null }
+    // Antes se partía del máximo entre el último mes y el mes actual: si el
+    // último guardado era octubre y ya estábamos en noviembre, saltaba a
+    // diciembre. Ahora se toma el primer mes faltante después del más antiguo
+    // (rellena huecos) y, si no hay ninguno guardado, el mes actual.
+    const existentes = new Set(meses.map(m => m.mes))
+    let nuevoMes
+    if (existentes.size === 0) {
+      nuevoMes = currentMesKey()
+    } else {
+      nuevoMes = nextMesKey([...existentes].sort()[0])
+      while (existentes.has(nuevoMes)) nuevoMes = nextMesKey(nuevoMes)
+    }
     const { error } = await supabase.from('contenido_extra_meses').insert({
       mes: nuevoMes,
       label: mesKeyToLabel(nuevoMes),

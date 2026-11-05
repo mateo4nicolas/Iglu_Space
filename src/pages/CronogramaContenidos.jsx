@@ -3,8 +3,15 @@ import { useAuth } from '../context/AuthContext'
 import {
   useCronogramaContenidos, STAGE_DEFS, WEEK_DEFS, NETWORK_DEFS, ACTIVITY_FIELDS,
 } from '../hooks/useCronogramaContenidos'
-import { buildResumen } from '../utils/informeResumen'
+import { buildInformeEjecutivo, notaAutomatica, inferTipo } from '../utils/informeEjecutivo'
+import { generarInformePdf } from '../utils/informePdf'
+import { useTablaLayout } from '../hooks/useTablaLayout'
+import TablaLayoutModal from '../components/tablas/TablaLayoutModal'
+import CustomCell from '../components/tablas/CustomCell'
+import { linkLabels } from '../utils/linkLabels'
+import { InformeScreen, InformeContent, PrintTable, pdfPageClass, pdfPageContentClass, pdfCompactClass } from '../components/informe/InformePrint'
 import { cycleLabel, currentMesBase, shiftMesBase } from '../utils/cycleLabel'
+import NewClientBadge from '../components/ui/NewClientBadge'
 import styles from './CronogramaContenidos.module.css'
 
 const PERIODS = [
@@ -101,8 +108,55 @@ function BufferedField({ value, onCommit, className, placeholder, as = 'input', 
   )
 }
 
+// ── Títulos editables de la tabla (admin) ───────────────────────────────────
+const TL_DEFAULTS = {
+  title_bar: 'INFORME: CONTENIDOS Y PROGRAMACIÓN',
+  title_actividad: 'ACTIVIDAD',
+  group_creativo: 'Creativo',
+  group_programacion: 'Programación',
+  col_vector: 'Vector',
+  col_creativo: '# Creativo',
+  col_codigo: 'Código',
+  col_enlaces: 'Enlace(s)',
+  col_aprobacion: 'Aprobación',
+  sub_fecha: 'Fecha',
+  sub_posteo: 'Posteo',
+  col_observaciones: 'Observaciones',
+  nota_label: 'Nota importante',
+  ...Object.fromEntries(ACTIVITY_FIELDS.map(f => [`act_${f.key}`, f.label])),
+  ...Object.fromEntries(NETWORK_DEFS.map(n => [`net_${n.id}`, n.label])),
+  ...Object.fromEntries([...STAGE_DEFS, ...WEEK_DEFS.filter(w => w.id !== 'extra')].flatMap(s => [[`sec_${s.id}`, s.label], [`sec_${s.id}_short`, s.short]])),
+}
+const TL_HIDEABLE = ['col_vector', 'col_creativo', 'col_codigo', 'col_enlaces', 'col_aprobacion', 'sub_posteo', 'col_observaciones']
+const tlItem = key => ({ key, default: TL_DEFAULTS[key], hideable: TL_HIDEABLE.includes(key) })
+const TL_SECTIONS = [
+  { title: 'Encabezados', items: ['title_bar', 'title_actividad', 'group_creativo', 'group_programacion', 'nota_label'].map(tlItem) },
+  { title: 'Columnas (título y si se ve)', items: ['col_vector', 'col_creativo', 'col_codigo', 'col_enlaces', 'col_aprobacion', 'sub_fecha', 'sub_posteo', 'col_observaciones'].map(tlItem) },
+  { title: 'Actividad', items: ACTIVITY_FIELDS.map(f => tlItem(`act_${f.key}`)) },
+  { title: 'Redes', items: NETWORK_DEFS.map(n => tlItem(`net_${n.id}`)) },
+  { title: 'Etapas y semanas (nombre · banda lateral)', items: [...STAGE_DEFS, ...WEEK_DEFS.filter(w => w.id !== 'extra')].flatMap(s => [tlItem(`sec_${s.id}`), tlItem(`sec_${s.id}_short`)]) },
+]
+const TL_CUSTOM_GROUPS = [
+  { value: 'creativo', label: 'En: Creativo' },
+  { value: 'final', label: 'Antes de Observaciones' },
+]
+
+// Objeto de "layout" que se pasa a la tabla (pantalla y PDF)
+function buildTableLayout(tl) {
+  const t = key => tl.labelFor(key, TL_DEFAULTS[key])
+  return {
+    t,
+    show: key => !tl.isHidden(key),
+    customCreativo: tl.customIn('creativo').filter(c => !tl.isHidden(c.id)),
+    customFinal: tl.customIn('final').filter(c => !tl.isHidden(c.id)),
+  }
+}
+
 export default function CronogramaContenidosPage() {
-  const { hasPageAccess } = useAuth()
+  const { hasPageAccess, isAdmin } = useAuth()
+  const tl = useTablaLayout('informe_contenidos')
+  const tableLayout = buildTableLayout(tl)
+  const [showLayout, setShowLayout] = useState(false)
   // Admin siempre; otra persona solo si un admin le dio el permiso de Estructura (en Equipo)
   const canEditStructure = hasPageAccess('cronograma_estructura')
   const {
@@ -161,6 +215,7 @@ export default function CronogramaContenidosPage() {
                 onClick={() => { setSelectedClientId(c.id); setShowResumen(false) }}
               >
                 {c.brand_name}
+                <NewClientBadge client={c} mes={mesAno} />
               </button>
             ))}
           </div>
@@ -174,8 +229,10 @@ export default function CronogramaContenidosPage() {
               periodLabel={cycleLabel(mesAno, period)}
               canEditStructure={canEditStructure}
               config={getConfig(activeClient.id)}
-              sections={sectionsForClient(activeClient.id)}
-              networks={networksForClient(activeClient.id)}
+              sections={sectionsForClient(activeClient.id).map(s => ({ ...s, label: tableLayout.t(`sec_${s.id}`) || s.label, short: tableLayout.t(`sec_${s.id}_short`) || s.short }))}
+              networks={networksForClient(activeClient.id).map(n => ({ ...n, label: tableLayout.t(`net_${n.id}`) || n.label }))}
+              tableLayout={tableLayout}
+              onOpenLayout={isAdmin ? () => setShowLayout(true) : null}
               hasVector={hasVectorColumn(activeClient.id)}
               rowsFor={rowsFor}
               allRowsFor={allRowsFor}
@@ -195,6 +252,16 @@ export default function CronogramaContenidosPage() {
               onToggleResumen={() => setShowResumen(v => !v)}
             />
           )}
+          {showLayout && (
+            <TablaLayoutModal
+              title="Editar tabla · Informe de Contenidos"
+              sections={TL_SECTIONS}
+              customGroups={TL_CUSTOM_GROUPS}
+              layout={tl.layout}
+              onSave={tl.saveLayout}
+              onClose={() => setShowLayout(false)}
+            />
+          )}
         </>
       )}
     </div>
@@ -210,9 +277,11 @@ function ClientPanel({
   client, mes, period, periodLabel, canEditStructure, config, sections, networks, hasVector,
   rowsFor, allRowsFor, addRow, ensureSeeded, updateRow, deleteRow, actividadFecha, actividadNota, saveActividadNota,
   aprobacionFilaFecha, saveConfig, onOpenConfig, showConfig, onCloseConfig, showResumen, onToggleResumen,
+  tableLayout: L, onOpenLayout,
 }) {
   const panelRef = useRef(null)
-  const resumenRef = useRef(null)
+  const informeContentRef = useRef(null)
+  const printTableRef = useRef(null)
   const tableScrollRef = useRef(null)
   const activityBlockRef = useRef(null)
   const noteBoxRef = useRef(null)
@@ -225,117 +294,63 @@ function ClientPanel({
     })
   }, [client.id, mes, config.mode, config.vectors, sections.map(s => s.id).join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const resumenData = buildResumen({
+  // ── Informe ejecutivo + tabla para el PDF ──
+  const informeRows = buildInformeRows(client.id, mes, sections, networks, allRowsFor, aprobacionFilaFecha)
+  const activityData = ACTIVITY_FIELDS.map(f => ({
+    key: f.key,
+    label: L.t(`act_${f.key}`),
+    date: actividadFecha(client.id, mes, f.key),
+    note: actividadNota(client.id, mes, f.key)?.nota || '',
+  }))
+  const informe = buildInformeEjecutivo({
     clientName: client.brand_name,
     periodLabel,
-    rows: buildResumenRows(client.id, mes, sections, networks, allRowsFor, aprobacionFilaFecha),
+    mes,
+    period,
+    mode: config.mode,
+    vectors: config.vectors,
+    planNombre: (config.plan_nombre || '').trim(),
+    isFirstMonth: !!client.mes_inicio && client.mes_inicio === mes,
     networks,
-    activityRows: ACTIVITY_FIELDS.map(f => ({
-      label: f.label,
-      date: actividadFecha(client.id, mes, f.key),
-      note: actividadNota(client.id, mes, f.key)?.nota || '',
-    })),
+    sections,
+    rows: informeRows,
+    activity: activityData,
   })
+  const conteo = { posts: 0, videos: 0, otras: 0 }
+  informe.stats.rows?.forEach(r => { if (r.tipo === 'post') conteo.posts++; else if (r.tipo === 'video') conteo.videos++; else conteo.otras++ })
+  const planTxt = [
+    (config.plan_nombre || '').trim() || null,
+    config.mode !== 'semanas' && config.vectors ? `${config.vectors} ${config.vectors === 1 ? 'vector creativo' : 'vectores creativos'}` : null,
+  ].filter(Boolean).join(' · ') + (informe.stats.total
+    ? ` (${[conteo.posts && `${conteo.posts} ${conteo.posts === 1 ? 'post' : 'posts'}`, conteo.videos && `${conteo.videos} ${conteo.videos === 1 ? 'video' : 'videos'}`, conteo.otras && `${conteo.otras} ${conteo.otras === 1 ? 'pieza adicional' : 'piezas adicionales'}`].filter(Boolean).join(' + ')})`
+    : '')
+  const informeHeader = {
+    client: client.brand_name,
+    periodLabel,
+    grupoTxt: GRUPO_FACTURACION[period] || '',
+    planTxt: planTxt.trim(),
+  }
+  const printRowsBySection = {}
+  sections.forEach(sec => { printRowsBySection[sec.id] = informeRows.filter(r => r.seccionId === sec.id && r.__registrada) })
+  const notaTabla = (config.nota_general || '').trim() || notaAutomatica(informe.stats, periodLabel)
 
   async function handleDownload() {
-    if (!panelRef.current || downloading) return
+    if (!informeContentRef.current || downloading) return
     setDownloading(true)
-
-    // Mientras se genera el PDF, se quita el recorte por scroll (alto y ancho)
-    // del contenedor de la tabla para que la captura incluya TODO.
-    const scrollEl = tableScrollRef.current
-    const prevStyle = scrollEl ? { maxHeight: scrollEl.style.maxHeight, overflow: scrollEl.style.overflow } : null
-    if (scrollEl) { scrollEl.style.maxHeight = 'none'; scrollEl.style.overflow = 'visible' }
-
     try {
-      const [{ default: html2canvas }, jspdfMod] = await Promise.all([import('html2canvas'), import('jspdf')])
-      const jsPDF = jspdfMod.jsPDF || jspdfMod.default
-      const A4 = { w: 595.28, h: 841.89 }
-      const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' })
-
-      async function capture(el, widthOverride) {
-        const w = widthOverride || Math.max(el.scrollWidth, el.offsetWidth)
-        const h = Math.max(el.scrollHeight, el.offsetHeight)
-        return html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: w, height: h, windowWidth: w, windowHeight: h })
-      }
-
-      // Página 1: resumen interpretativo (una hoja tipo carta, se reparte hacia
-      // abajo si el contenido no cabe entero, nunca se corta el ancho).
-      if (resumenRef.current) {
-        const canvas = await capture(resumenRef.current)
-        const ptPerPx = A4.w / canvas.width
-        const chunkPx = A4.h / ptPerPx
-        let y = 0, first = true
-        while (y < canvas.height - 0.5) {
-          const sliceH = Math.min(chunkPx, canvas.height - y)
-          const slice = document.createElement('canvas')
-          slice.width = canvas.width; slice.height = Math.round(sliceH)
-          slice.getContext('2d').drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
-          if (!first) doc.addPage([A4.w, A4.h], 'portrait')
-          first = false
-          doc.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, A4.w, sliceH * ptPerPx)
-          y += sliceH
-        }
-      }
-
-      // Páginas de la tabla: horizontal (más ancho disponible), fila por fila,
-      // así ninguna fila queda partida entre dos páginas. El encabezado de la
-      // tabla se repite arriba de cada página nueva.
-      const pageW = A4.h, pageH = A4.w
-      doc.addPage([A4.w, A4.h], 'landscape')
-      let cursorY = 0
-      let tablePtPerPx = null
-      let headerCanvas = null
-
-      function placeBlock(canvas, ptPerPx, { repeatHeader } = {}) {
-        const hPt = canvas.height * ptPerPx
-        if (cursorY > 0 && cursorY + hPt > pageH) {
-          doc.addPage([A4.w, A4.h], 'landscape')
-          cursorY = 0
-          if (repeatHeader && headerCanvas) placeBlock(headerCanvas, tablePtPerPx)
-        }
-        doc.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, cursorY, pageW, hPt)
-        cursorY += hPt
-      }
-
-      if (activityBlockRef.current) {
-        const canvas = await capture(activityBlockRef.current)
-        placeBlock(canvas, pageW / canvas.width)
-      }
-
-      const tableEl = tableScrollRef.current?.querySelector('table')
-      if (tableEl) {
-        const fullW = Math.max(tableEl.scrollWidth, tableEl.offsetWidth)
-        const theadEl = tableEl.querySelector('thead')
-        if (theadEl) {
-          headerCanvas = await capture(theadEl, fullW)
-          tablePtPerPx = pageW / headerCanvas.width
-          placeBlock(headerCanvas, tablePtPerPx)
-        }
-        const sectionEls = Array.from(tableEl.querySelectorAll('tbody[data-pdf-section]'))
-        for (const sectionEl of sectionEls) {
-          // Oculta temporalmente la fila de "Añadir fila" (no debe salir en el informe)
-          const skipRows = Array.from(sectionEl.querySelectorAll('[data-pdf-skip]'))
-          const prevDisplay = skipRows.map(r => r.style.display)
-          skipRows.forEach(r => { r.style.display = 'none' })
-          const sectionCanvas = await capture(sectionEl, fullW)
-          skipRows.forEach((r, i) => { r.style.display = prevDisplay[i] })
-          placeBlock(sectionCanvas, tablePtPerPx || pageW / sectionCanvas.width, { repeatHeader: true })
-        }
-      }
-
-      if (noteBoxRef.current) {
-        const canvas = await capture(noteBoxRef.current)
-        placeBlock(canvas, pageW / canvas.width)
-      }
-
-      const base = `Informe_${client.brand_name}_${periodLabel}`.replace(/[^\w-]+/g, '_')
-      doc.save(`${base}.pdf`)
+      const base = `InformeContenidos_${client.brand_name}_${periodLabel}`.replace(/[^\w-]+/g, '_').replace(/_+/g, '_')
+      await generarInformePdf({
+        contentEl: informeContentRef.current,
+        tableEl: printTableRef.current,
+        pageClass: pdfPageClass,
+        pageContentClass: pdfPageContentClass,
+        compactClass: pdfCompactClass,
+        fileName: `${base}.pdf`,
+      })
     } catch (err) {
       console.error(err)
       alert('No se pudo generar el informe. Revisa la consola para más detalle.')
     } finally {
-      if (scrollEl && prevStyle) { scrollEl.style.maxHeight = prevStyle.maxHeight; scrollEl.style.overflow = prevStyle.overflow }
       setDownloading(false)
     }
   }
@@ -358,8 +373,13 @@ function ClientPanel({
               <GearIcon /> Estructura
             </button>
           )}
+          {onOpenLayout && (
+            <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onOpenLayout}>
+              ✏️ Editar tabla
+            </button>
+          )}
           <button className={`btn btn-ghost ${styles.resumenToggle}`} style={{ fontSize: 12 }} onClick={onToggleResumen}>
-            <NoteIcon /> {showResumen ? 'Ocultar resumen' : 'Ver resumen'}
+            <NoteIcon /> {showResumen ? 'Ocultar informe' : 'Ver informe'}
           </button>
           <button className={`btn btn-ghost ${styles.downloadBtn}`} style={{ fontSize: 12 }} onClick={handleDownload} disabled={downloading}>
             <DownloadIcon /> {downloading ? 'Generando...' : 'Descargar informe'}
@@ -367,14 +387,32 @@ function ClientPanel({
         </div>
       </div>
 
-      {/* Resumen: visible en pantalla si se activa, y siempre capturado para el PDF (fuera de vista si está oculto) */}
-      <div ref={resumenRef} style={!showResumen ? { position: 'absolute', left: -99999, top: 0, width: 780 } : undefined}>
-        <ResumenView client={client} period={period} periodLabel={periodLabel} data={resumenData} />
+      {/* Informe ejecutivo en pantalla (si se activa) */}
+      {showResumen && <InformeScreen header={informeHeader} blocks={informe.blocks} />}
+
+      {/* Fuente para el PDF: contenido del informe y tabla limpia, fuera de vista */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: -100000, top: 0, width: 660 }}>
+        <InformeContent ref={informeContentRef} header={informeHeader} blocks={informe.blocks} />
+      </div>
+      <div aria-hidden="true" style={{ position: 'absolute', left: -100000, top: 0 }}>
+        <PrintTable
+          ref={printTableRef}
+          client={client.brand_name}
+          periodLabel={periodLabel}
+          activity={activityData}
+          sections={sections}
+          rowsBySection={printRowsBySection}
+          networks={networks}
+          hasVector={hasVector}
+          nota={notaTabla}
+          layout={L}
+        />
       </div>
 
       <div ref={panelRef}>
         <div ref={activityBlockRef}>
           <ActivityBlock
+            L={L}
             client={client}
             mes={mes}
             periodLabel={periodLabel}
@@ -389,7 +427,7 @@ function ClientPanel({
             <div className={styles.empty}>Este cliente no tiene etapas o semanas configuradas. Usa "Estructura" para elegirlas.</div>
           ) : (
             <table className={styles.table}>
-              <TableHead hasVector={hasVector} networks={networks} />
+              <TableHead hasVector={hasVector} networks={networks} L={L} />
               {sections.map(sec => (
                 <tbody key={sec.id} data-pdf-section={sec.id}>
                   <SectionRows
@@ -399,12 +437,13 @@ function ClientPanel({
                     config={config}
                     hasVector={hasVector}
                     networks={networks}
+                    L={L}
                     rowsFor={rowsFor}
                     addRow={addRow}
                     updateRow={updateRow}
                     deleteRow={deleteRow}
                     aprobacionFilaFecha={aprobacionFilaFecha}
-                    totalCols={1 + (hasVector ? 1 : 0) + 4 + networks.length * 2 + 1 + 1}
+                    totalCols={tableColCount(hasVector, networks, L) + 1}
                   />
                 </tbody>
               ))}
@@ -413,7 +452,7 @@ function ClientPanel({
         </div>
 
         <div className={styles.noteBox} ref={noteBoxRef}>
-          <div className={styles.noteLabel}>Nota importante</div>
+          <div className={styles.noteLabel}>{L.t('nota_label')}</div>
           <ClientNote client={client} config={config} saveConfig={saveConfig} />
         </div>
       </div>
@@ -425,79 +464,47 @@ function ClientPanel({
   )
 }
 
-// Arma las filas "resueltas" (con la fecha de aprobación ya conectada a la Matriz
-// cuando corresponde) para alimentar el resumen interpretativo.
-function buildResumenRows(clientId, mes, sections, networks, allRowsFor, aprobacionFilaFecha) {
+// Filas "resueltas" del cronograma (aprobación conectada a la Matriz cuando
+// corresponde) para el informe ejecutivo y la tabla del PDF.
+function buildInformeRows(clientId, mes, sections, networks, allRowsFor, aprobacionFilaFecha) {
   const all = allRowsFor(clientId, mes)
-  const bySeccion = {}
-  sections.forEach(sec => { bySeccion[sec.id] = all.filter(r => r.seccion === sec.id).sort((a, b) => (a.position || 0) - (b.position || 0)) })
-
   const out = []
   sections.forEach(sec => {
-    const rows = bySeccion[sec.id] || []
+    const rows = all.filter(r => r.seccion === sec.id).sort((a, b) => (a.position || 0) - (b.position || 0))
     const countByTipo = {}
     rows.forEach(r => {
       const idx = r.tipo ? (countByTipo[r.tipo] = (countByTipo[r.tipo] ?? -1) + 1) : null
       const manualAprob = r.aprobacion_fecha ? String(r.aprobacion_fecha).slice(0, 10) : null
-      const aprobacionFecha = manualAprob || (AUTO_APROB_SECTIONS.includes(sec.id) && r.tipo
+      const aprobacion = manualAprob || (AUTO_APROB_SECTIONS.includes(sec.id) && r.tipo
         ? aprobacionFilaFecha(clientId, mes, sec.id, r.tipo, idx)
         : null)
+      const pubs = {}
+      const posteos = {}
+      networks.forEach(n => {
+        pubs[n.id] = r[n.field + '_fecha'] || null
+        posteos[n.id] = r[n.field + '_posteo'] || ''
+      })
+      const tipo = inferTipo(r)
       out.push({
+        id: r.id,
         seccionId: sec.id,
         seccionLabel: sec.label,
-        codigo: r.codigo,
+        seccionShort: sec.short,
+        vector: r.vector,
+        tipo,
         creativo: r.creativo,
-        aprobacionFecha,
-        fb_fecha: r.fb_fecha, ig_fecha: r.ig_fecha, tt_fecha: r.tt_fecha,
+        codigo: r.codigo,
+        enlaces: r.enlaces || [],
+        aprobacion,
+        pubs,
+        posteos,
         observaciones: r.observaciones,
+        extra: r.extra || {},
+        __registrada: !!(r.codigo || r.creativo || aprobacion || (r.enlaces || []).length || Object.values(pubs).some(Boolean) || r.observaciones),
       })
     })
   })
   return out
-}
-
-function ResumenView({ client, period, periodLabel, data }) {
-  const now = new Date()
-  const genDate = now.toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  const grupoTxt = GRUPO_FACTURACION[period] || ''
-  return (
-    <div className={styles.resumenOuter}>
-      <div className={styles.resumenPage}>
-        <div className={styles.resumenContent}>
-          <div className={styles.resumenTitle}>Informe de contenidos y programación</div>
-          <div className={styles.resumenMeta}>
-            <div><strong>Cliente:</strong> {client.brand_name}</div>
-            <div><strong>Periodo analizado:</strong> {periodLabel}</div>
-            {grupoTxt && <div><strong>Grupo de facturación:</strong> {grupoTxt}</div>}
-            <div><strong>Generado:</strong> {genDate}</div>
-          </div>
-          <div className={styles.resumenIntro}>Este resumen interpreta, a modo de informe, la información cargada hasta ahora en el cronograma de <strong>{client.brand_name}</strong> para el periodo <strong>{periodLabel}</strong>.</div>
-
-          <div className={styles.resumenH2}>Estado general</div>
-          {data.estadoGeneral.map((p, i) => <div key={i} className={styles.resumenP}>{renderBold(p)}</div>)}
-
-          <div className={styles.resumenH2}>Publicaciones por red</div>
-          {data.publicacionesPorRed.map((p, i) => <div key={i} className={styles.resumenP}>{renderBold(p)}</div>)}
-
-          <div className={styles.resumenH2}>Actividad</div>
-          {data.actividad.map((p, i) => <div key={i} className={styles.resumenP}>{renderBold(p)}</div>)}
-
-          <div className={styles.resumenH2}>Observaciones</div>
-          <div className={styles.resumenP}>{renderBold(data.observaciones.intro)}</div>
-          {data.observaciones.items.length > 0 && (
-            <ul className={styles.resumenUl}>
-              {data.observaciones.items.map((it, i) => <li key={i}><strong>{it.codigo}</strong> — {it.texto}</li>)}
-            </ul>
-          )}
-          {data.observaciones.moreCount > 0 && (
-            <div className={styles.resumenMore}>… y {data.observaciones.moreCount} observación(es) más. Ver detalle en la tabla adjunta.</div>
-          )}
-
-          <div className={styles.resumenFooter}>Nota: este resumen interpreta únicamente la información cargada hasta el momento de la descarga. Actualízalo conforme se registren nuevos datos en el cronograma.</div>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 function ClientNote({ client, config, saveConfig }) {
@@ -513,17 +520,17 @@ function ClientNote({ client, config, saveConfig }) {
   )
 }
 
-function ActivityBlock({ client, mes, periodLabel, actividadFecha, actividadNota, saveActividadNota }) {
+function ActivityBlock({ L, client, mes, periodLabel, actividadFecha, actividadNota, saveActividadNota }) {
   return (
     <div className={styles.infoBlock}>
-      <div className={styles.infoTitleBar}>INFORME: CONTENIDOS Y PROGRAMACIÓN</div>
+      <div className={styles.infoTitleBar}>{L.t('title_bar')}</div>
       <div className={styles.idGrid}>
         <div className={styles.cellLabel}>CLIENTE:</div>
         <div className={styles.cellValue}>{client.brand_name}</div>
         <div className={styles.cellLabel}>PERIODO:</div>
         <div className={styles.cellValue}>{periodLabel}</div>
       </div>
-      <div className={`${styles.infoTitleBar} ${styles.sub}`}>ACTIVIDAD</div>
+      <div className={`${styles.infoTitleBar} ${styles.sub}`}>{L.t('title_actividad')}</div>
       <div className={styles.activityGrid}>
         {ACTIVITY_FIELDS.map(f => (
           <ActivityRow
@@ -531,7 +538,7 @@ function ActivityBlock({ client, mes, periodLabel, actividadFecha, actividadNota
             client={client}
             mes={mes}
             campo={f.key}
-            label={f.label}
+            label={L.t(`act_${f.key}`)}
             fecha={actividadFecha(client.id, mes, f.key)}
             nota={actividadNota(client.id, mes, f.key)}
             saveActividadNota={saveActividadNota}
@@ -573,29 +580,39 @@ function ActivityRow({ client, mes, campo, label, fecha, nota, saveActividadNota
   )
 }
 
-function TableHead({ hasVector, networks }) {
+// Número de columnas de datos (sin la columna de acciones)
+function tableColCount(hasVector, networks, L) {
+  const vec = hasVector && L.show('col_vector') ? 1 : 0
+  const cre = ['col_creativo', 'col_codigo', 'col_enlaces', 'col_aprobacion'].filter(L.show).length + L.customCreativo.length
+  const net = networks.length * (L.show('sub_posteo') ? 2 : 1)
+  return 1 + vec + cre + net + L.customFinal.length + (L.show('col_observaciones') ? 1 : 0)
+}
+
+function TableHead({ hasVector, networks, L }) {
+  const creCols = ['col_creativo', 'col_codigo', 'col_enlaces', 'col_aprobacion'].filter(L.show)
+  const creSpan = creCols.length + L.customCreativo.length
+  const showPosteo = L.show('sub_posteo')
   return (
     <thead>
       <tr>
         <th className={styles.hdTeal} rowSpan={3} style={{ width: 30 }}></th>
-        {hasVector && <th className={styles.hdTeal} rowSpan={3}>Vector</th>}
-        <th className={styles.hdCoral} colSpan={4}>Creativo</th>
-        {networks.length > 0 && <th className={styles.hdTeal} colSpan={networks.length * 2}>Programación</th>}
-        <th className={styles.hdTeal} rowSpan={3}>Observaciones</th>
+        {hasVector && L.show('col_vector') && <th className={styles.hdTeal} rowSpan={3}>{L.t('col_vector')}</th>}
+        {creSpan > 0 && <th className={styles.hdCoral} colSpan={creSpan}>{L.t('group_creativo')}</th>}
+        {networks.length > 0 && <th className={styles.hdTeal} colSpan={networks.length * (showPosteo ? 2 : 1)}>{L.t('group_programacion')}</th>}
+        {L.customFinal.map(c => <th key={c.id} className={styles.hdTeal} rowSpan={3}>{c.label}</th>)}
+        {L.show('col_observaciones') && <th className={styles.hdTeal} rowSpan={3}>{L.t('col_observaciones')}</th>}
         <th className={styles.hdTeal} rowSpan={3} style={{ width: 30 }}></th>
       </tr>
       <tr>
-        <th className={styles.hdCoralSoft} rowSpan={2}># Creativo</th>
-        <th className={styles.hdCoralSoft} rowSpan={2}>Código</th>
-        <th className={styles.hdCoralSoft} rowSpan={2}>Enlace(s)</th>
-        <th className={styles.hdCoralSoft} rowSpan={2}>Aprobación</th>
-        {networks.map(n => <th key={n.id} className={NET_HEAD[n.id] || styles.hdTeal} colSpan={2}>{n.label}</th>)}
+        {creCols.map(k => <th key={k} className={styles.hdCoralSoft} rowSpan={2}>{L.t(k)}</th>)}
+        {L.customCreativo.map(c => <th key={c.id} className={styles.hdCoralSoft} rowSpan={2}>{c.label}</th>)}
+        {networks.map(n => <th key={n.id} className={NET_HEAD[n.id] || styles.hdTeal} colSpan={showPosteo ? 2 : 1}>{n.label}</th>)}
       </tr>
       <tr>
         {networks.map(n => (
           <Fragment key={n.id}>
-            <th className={NET_HEAD_SOFT[n.id] || styles.hdTeal}>Fecha</th>
-            <th className={NET_HEAD_SOFT[n.id] || styles.hdTeal}>Posteo</th>
+            <th className={NET_HEAD_SOFT[n.id] || styles.hdTeal}>{L.t('sub_fecha')}</th>
+            {showPosteo && <th className={NET_HEAD_SOFT[n.id] || styles.hdTeal}>{L.t('sub_posteo')}</th>}
           </Fragment>
         ))}
       </tr>
@@ -603,7 +620,7 @@ function TableHead({ hasVector, networks }) {
   )
 }
 
-function SectionRows({ section, clientId, mes, config, hasVector, networks, rowsFor, addRow, updateRow, deleteRow, aprobacionFilaFecha, totalCols }) {
+function SectionRows({ section, clientId, mes, config, hasVector, networks, L, rowsFor, addRow, updateRow, deleteRow, aprobacionFilaFecha, totalCols }) {
   const rows = rowsFor(clientId, mes, section.id)
   const secClass = styles[SEC_CLASS[section.id]] || ''
   const autoAprob = AUTO_APROB_SECTIONS.includes(section.id)
@@ -631,21 +648,27 @@ function SectionRows({ section, clientId, mes, config, hasVector, networks, rows
                 <div className={styles.etapaBand}>{section.short}</div>
               </td>
             )}
-            {hasVector && (
+            {hasVector && L.show('col_vector') && (
               <td className={`${styles.cellEditable} ${styles.colVector}`}>
                 <BufferedField className={styles.cellInput} value={row.vector || ''} placeholder="vector" onCommit={v => updateRow(row.id, { vector: v })} />
               </td>
             )}
-            <td className={`${styles.cellEditable} ${styles.colCreativo}`}>
-              <BufferedField className={styles.cellInput} value={row.creativo || ''} placeholder="# creativo" onCommit={v => updateRow(row.id, { creativo: v })} />
-            </td>
-            <td className={`${styles.cellEditable} ${styles.colCodigo}`}>
-              <BufferedField className={styles.cellInput} value={row.codigo || ''} placeholder="código" onCommit={v => updateRow(row.id, { codigo: v })} />
-            </td>
-            <td className={styles.linksCell}>
-              <LinksEditor value={row.enlaces || []} onCommit={v => updateRow(row.id, { enlaces: v })} />
-            </td>
-            <td className={styles.aprobRO}>
+            {L.show('col_creativo') && (
+              <td className={`${styles.cellEditable} ${styles.colCreativo}`}>
+                <BufferedField className={styles.cellInput} value={row.creativo || ''} placeholder="# creativo" onCommit={v => updateRow(row.id, { creativo: v })} />
+              </td>
+            )}
+            {L.show('col_codigo') && (
+              <td className={`${styles.cellEditable} ${styles.colCodigo}`}>
+                <BufferedField className={styles.cellInput} value={row.codigo || ''} placeholder="código" onCommit={v => updateRow(row.id, { codigo: v })} />
+              </td>
+            )}
+            {L.show('col_enlaces') && (
+              <td className={styles.linksCell}>
+                <LinksEditor value={row.enlaces || []} onCommit={v => updateRow(row.id, { enlaces: v })} />
+              </td>
+            )}
+            {L.show('col_aprobacion') && <td className={styles.aprobRO}>
               <input
                 type="date"
                 className={styles.dateInput}
@@ -653,20 +676,34 @@ function SectionRows({ section, clientId, mes, config, hasVector, networks, rows
                 value={row.aprobacion_fecha ? String(row.aprobacion_fecha).slice(0, 10) : toLocalDateInput(aprobFecha)}
                 onChange={e => updateRow(row.id, { aprobacion_fecha: e.target.value || null })}
               />
-            </td>
+            </td>}
+            {L.customCreativo.map(c => (
+              <td key={c.id} className={styles.cellEditable}>
+                <CustomCell tipo={c.tipo} value={row.extra?.[c.id]} inputClassName={styles.cellInput} onCommit={v => updateRow(row.id, { extra: { ...(row.extra || {}), [c.id]: v } })} />
+              </td>
+            ))}
             {networks.map(n => (
               <Fragment key={n.id}>
                 <td className={styles.dateCol}>
                   <input type="date" className={styles.dateInput} value={toDateInputValue(row[n.field + '_fecha'])} onChange={e => updateRow(row.id, { [n.field + '_fecha']: e.target.value || null })} />
                 </td>
-                <td className={styles.cellEditable}>
-                  <BufferedField as="textarea" rows={1} className={styles.cellTextarea} value={row[n.field + '_posteo'] || ''} placeholder="posteo" onCommit={v => updateRow(row.id, { [n.field + '_posteo']: v })} />
-                </td>
+                {L.show('sub_posteo') && (
+                  <td className={styles.cellEditable}>
+                    <BufferedField as="textarea" rows={1} className={styles.cellTextarea} value={row[n.field + '_posteo'] || ''} placeholder="posteo" onCommit={v => updateRow(row.id, { [n.field + '_posteo']: v })} />
+                  </td>
+                )}
               </Fragment>
             ))}
-            <td className={`${styles.cellEditable} ${styles.colObs}`}>
-              <BufferedField as="textarea" rows={1} className={styles.cellTextarea} value={row.observaciones || ''} placeholder="observaciones" onCommit={v => updateRow(row.id, { observaciones: v })} />
-            </td>
+            {L.customFinal.map(c => (
+              <td key={c.id} className={styles.cellEditable}>
+                <CustomCell tipo={c.tipo} value={row.extra?.[c.id]} inputClassName={styles.cellInput} onCommit={v => updateRow(row.id, { extra: { ...(row.extra || {}), [c.id]: v } })} />
+              </td>
+            ))}
+            {L.show('col_observaciones') && (
+              <td className={`${styles.cellEditable} ${styles.colObs}`}>
+                <BufferedField as="textarea" rows={1} className={styles.cellTextarea} value={row.observaciones || ''} placeholder="observaciones" onCommit={v => updateRow(row.id, { observaciones: v })} />
+              </td>
+            )}
             <td className={styles.actionsCell}>
               <button className={styles.rowDel} title="Quitar fila" onClick={() => deleteRow(row.id)}><TrashIcon /></button>
             </td>
@@ -703,15 +740,15 @@ function LinksEditor({ value, onCommit }) {
     <div>
       {value && value.length > 0 && (
         <div className={styles.linksList}>
-          {value.map((url, i) => (
+          {(() => { const labels = linkLabels(value); return value.map((url, i) => (
             <div key={i} className={styles.linkChip}>
-              <a href={url} target="_blank" rel="noopener noreferrer" title={url}>{url.replace(/^https?:\/\//, '')}</a>
-              <button className={styles.linkChipRemove} onClick={() => removeLink(i)} title="Quitar enlace">✕</button>
+              <a href={url} target="_blank" rel="noopener noreferrer" title={url} data-pdf-link={url} className={styles.linkTag}>🔗 {labels[i]}</a>
+              <button className={styles.linkChipRemove} onClick={() => removeLink(i)} title="Quitar enlace" data-pdf-hide="true">✕</button>
             </div>
-          ))}
+          )) })()}
         </div>
       )}
-      <div className={styles.linkAddRow}>
+      <div className={styles.linkAddRow} data-pdf-hide="true">
         <input
           className={styles.linkAddInput}
           placeholder="pegar enlace"
@@ -748,6 +785,16 @@ function ConfigModal({ client, config, onSave, onClose }) {
           <button className={styles.closeBtn} onClick={onClose}><CloseIcon /></button>
         </div>
         <div className={styles.modalForm}>
+          <div>
+            <div className={styles.fieldLabel}>Plan contratado (aparece en el informe)</div>
+            <input
+              className={styles.planInput}
+              placeholder="Ej. IGLÜ Steps"
+              value={draft.plan_nombre || ''}
+              onChange={e => setDraft(d => ({ ...d, plan_nombre: e.target.value }))}
+            />
+          </div>
+
           <div>
             <div className={styles.fieldLabel}>Tipo de tabla</div>
             <div className={styles.modeSwitch}>

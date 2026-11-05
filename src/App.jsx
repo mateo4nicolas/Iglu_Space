@@ -16,6 +16,7 @@ import ContenidoExtraPage from './pages/ContenidoExtra'
 import CronogramaContenidosPage from './pages/CronogramaContenidos'
 import CobroClientesPage from './pages/CobroClientes'
 import ConfiguracionPage from './pages/Configuracion'
+import SeguimientoPautaPage from './pages/SeguimientoPauta'
 import ToastContainer from './components/ui/Toast'
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/matriz"        element={<MatrizPage />} />
             <Route path="/contenido-extra" element={<ContenidoExtraPage />} />
             <Route path="/cronograma-contenidos" element={<PageAccessRoute page="cronograma_contenidos"><CronogramaContenidosPage /></PageAccessRoute>} />
+            <Route path="/seguimiento-pauta" element={<SeguimientoPautaPage />} />
             <Route path="/cobro-clientes" element={<FinancialAccessRoute><CobroClientesPage /></FinancialAccessRoute>} />
             <Route path="/equipo"        element={<AdminRoute><EquipoPage /></AdminRoute>} />
             <Route path="/admin"         element={<AdminRoute><AdminPage /></AdminRoute>} />

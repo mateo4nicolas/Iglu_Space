@@ -1,0 +1,17 @@
+.wrap { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
+.obs { border-left: 2px solid var(--border-light); padding: 3px 0 3px 8px; }
+.obsMine { border-left-color: var(--accent); }
+.obsHead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.author { font-size: 11.5px; font-weight: 600; color: var(--text-secondary); }
+.time { font-size: 10.5px; color: var(--text-muted); }
+.actions { display: flex; gap: 2px; margin-left: auto; }
+.iconBtn { border: none; background: none; color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 2px 5px; border-radius: var(--radius-sm); min-height: 28px; touch-action: manipulation; }
+.iconBtn:hover { color: var(--accent); background: var(--bg-hover); }
+.iconDanger:hover { color: var(--danger); background: var(--danger-dim); }
+.text { font-size: 12px; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; margin: 1px 0 0; }
+.editBox { display: flex; flex-direction: column; gap: 6px; }
+.input { background: var(--bg-hover); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 7px 10px; font-size: 16px; color: var(--text-primary); outline: none; resize: none; width: 100%; box-sizing: border-box; font-family: var(--font); -webkit-appearance: none; appearance: none; }
+.input:focus { border-color: var(--accent); }
+.btnRow { display: flex; gap: 6px; }
+.addBtn { font-size: 12px; color: var(--accent); background: none; border: none; text-align: left; padding: 0; cursor: pointer; width: fit-content; min-height: 36px; touch-action: manipulation; }
+.addBtn:active { text-decoration: underline; }

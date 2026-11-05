@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useCobroClientes, PAUTA_METODOS } from '../hooks/useCobroClientes'
 import { cycleLabel, currentCycleMesBase, shiftMesBase } from '../utils/cycleLabel'
+import NewClientBadge from '../components/ui/NewClientBadge'
 import styles from './CobroClientes.module.css'
 
 // El cobro se sigue en un solo ciclo (15 a 14 de cada mes) para todos los
@@ -166,7 +167,7 @@ function ClientRow({ client, mes, rowFor, saveRow, onRemove }) {
   const row = rowFor(client.id, mes) || {}
   return (
     <tr>
-      <td className={styles.clientCell}>{client.nombre}</td>
+      <td className={styles.clientCell}>{client.nombre}<NewClientBadge client={client} mes={mes} /></td>
       <td>
         <input
           type="date"

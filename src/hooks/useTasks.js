@@ -1,11 +1,14 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { personalTaskView } from '../utils/sharedTask'
+import { notifyTasksChanged, useTasksChanged } from '../utils/taskEvents'
 
 export function useTasks(departmentId) {
   const { profile, isAdmin, isSuperAdmin } = useAuth()
-  const [tasks, setTasks] = useState([])
+  const [rawTasks, setRawTasks] = useState([])
   const [columns, setColumns] = useState([])
+  const [allColumns, setAllColumns] = useState([])
   const [loading, setLoading] = useState(true)
 
   const fetchColumns = useCallback(async () => {
@@ -17,6 +20,7 @@ export function useTasks(departmentId) {
       .order('position')
 
     const allCols = data || []
+    setAllColumns(allCols)
 
     if (isSuperAdmin) {
       setColumns(allCols)
@@ -36,13 +40,23 @@ export function useTasks(departmentId) {
       .order('created_at', { ascending: false })
 
     if (!isAdmin && !isSuperAdmin) {
-      query = query.or(`assigned_to.eq.${profile.id},created_by.eq.${profile.id}`)
+      query = query.or(`assigned_to.eq.${profile.id},created_by.eq.${profile.id},shared_with.cs.{${profile.id}}`)
     }
 
     const { data } = await query
-    setTasks(data || [])
+    setRawTasks(data || [])
     setLoading(false)
   }, [profile, isAdmin, isSuperAdmin, departmentId])
+
+  // Editores: las tareas compartidas se muestran en la columna propia de cada
+  // uno y se ocultan cuando ya mandaron su parte. Admin/supervisor ve la
+  // tarea real (llega a sus columnas solo cuando todos la mandaron).
+  const tasks = useMemo(() => {
+    if (isAdmin || isSuperAdmin || !profile) return rawTasks
+    return rawTasks.map(t => personalTaskView(t, profile.id, allColumns)).filter(Boolean)
+  }, [rawTasks, allColumns, isAdmin, isSuperAdmin, profile])
+
+  useTasksChanged(fetchTasks)
 
   useEffect(() => {
     if (!departmentId) return
@@ -76,6 +90,7 @@ export function useTasks(departmentId) {
       // directamente a "Enviado al Cliente" (ambas columnas de usuario),
       // para llevar el control de lo que ya se envió. No aplica en ninguna otra columna.
       if (task) {
+        // task.column_id ya es la columna propia del editor en tareas compartidas
         const currentCol = data.find(c => c.id === task.column_id)
         if (currentCol && normTitle(currentCol.title) === 'enviar al cliente') {
           const enviado = data.find(c => c.owner_role === 'user' && normTitle(c.title) === 'enviado al cliente')
@@ -101,7 +116,25 @@ export function useTasks(departmentId) {
       })
       .select()
       .single()
-    if (!error) fetchTasks()
+
+    // Si la tarea nace asignada, se agenda en el cronograma de esa persona
+    // (y de los editores con los que se comparte).
+    if (!error && data) {
+      const assignees = [...new Set([data.assigned_to, ...(data.shared_with || [])].filter(Boolean))]
+      if (assignees.length > 0) {
+        const { error: schedError } = await supabase.from('schedule_items').insert({
+          title: data.title,
+          task_id: data.id,
+          assigned_to: assignees,
+          date: data.fecha_cronograma || new Date().toISOString().slice(0, 10),
+          created_by: profile.id,
+          done_by: [],
+        })
+        if (schedError) console.error('No se pudo agendar en el cronograma:', schedError)
+      }
+    }
+
+    if (!error) { fetchTasks(); notifyTasksChanged() }
     return { data, error }
   }
 
@@ -110,7 +143,12 @@ export function useTasks(departmentId) {
       .from('tasks')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-    if (!error) fetchTasks()
+    if (error) {
+      console.error('updateTask error:', error)
+    } else {
+      await fetchTasks()
+      notifyTasksChanged()
+    }
     return { error }
   }
 
@@ -154,6 +192,7 @@ export function useTasks(departmentId) {
     const { error } = await supabase.from('tasks').delete().eq('id', id)
     if (error) { console.error('deleteTask error:', error); return { error } }
     fetchTasks()
+    notifyTasksChanged()
     return { error: null }
   }
 
