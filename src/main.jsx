@@ -19,7 +19,7 @@ function showFatalError(message, stack) {
     '<p style="font-size:12.5px;font-weight:700;color:#b91c1c;margin:0 0 6px;word-break:break-word;">' + safeMsg + '</p>' +
     '<pre style="font-size:10.5px;color:#7f1d1d;white-space:pre-wrap;word-break:break-word;margin:0;font-family:monospace;max-height:220px;overflow-y:auto;">' + safeStack + '</pre>' +
     '</div>' +
-    '<button onclick="window.location.reload()" style="background:#5b5fcf;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-size:14px;margin-bottom:40px;">Recargar</button>' +
+    '<button onclick="window.location.reload()" style="background:#0E7C86;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-size:14px;margin-bottom:40px;">Recargar</button>' +
     '</div>'
 }
 

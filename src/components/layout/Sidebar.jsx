@@ -64,11 +64,18 @@ export default function Sidebar() {
       <aside className={`${styles.sidebar} ${open ? styles.open : ''}`}>
         <div className={styles.logo}>
           <div className={styles.logoIcon}>
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-              <path d="M10 2L3 7v11h5v-5h4v5h5V7L10 2z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+            {/* Iglú: cúpula con bloques y entrada */}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 18.5a9 9 0 0118 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+              <path d="M2.5 18.5h19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+              <path d="M9.5 18.5v-3a2.5 2.5 0 015 0v3" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+              <path d="M5.2 13.5h4.3M14.5 13.5h4.3M8 10h8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity="0.75"/>
             </svg>
           </div>
-          <span className={styles.logoText}>Iglu Space</span>
+          <span className={styles.logoText}>
+            iglü space
+            <span className={styles.logoSub}>Plataforma operativa</span>
+          </span>
         </div>
 
         <nav className={styles.nav}>

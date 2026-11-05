@@ -166,7 +166,7 @@ export default function MatrizPage() {
                 {activeMatrizColumns.map(col => (
                   <th key={col.id} className={styles.colHeader}>{col.label}</th>
                 ))}
-                {isAdmin && <th className={styles.colHeader}>Próximo mes</th>}
+                {isAdmin && <th className={styles.colHeader}>Generar tareas</th>}
               </tr>
             </thead>
             <tbody>
